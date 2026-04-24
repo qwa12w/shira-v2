@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة إدارة شراع | Admin</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { --p: #f59e0b; --d: #1e293b; --g: #64748b; --b: #f8fafc; --red: #ef4444; --green: #10b981; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    body { background: var(--b); color: var(--d); }
+    .hidden { display: none !important; }
+    button { cursor: pointer; border: none; }
+    input, select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; width: 100%; margin-bottom: 10px; }
+    .login-box { max-width: 400px; margin: 100px auto; background: #fff; padding: 30px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; }
+    .btn { padding: 12px 20px; border-radius: 10px; font-weight: 600; }
+    .btn-primary { background: var(--d); color: #fff; width: 100%; }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .dashboard { display: flex; min-height: 100vh; }
+    .sidebar { width: 280px; background: #fff; padding: 20px; border-left: 1px solid #e2e8f0; position: fixed; right: 0; top: 0; bottom: 0; overflow-y: auto; }
+    .sidebar h2 { text-align: center; color: var(--p); margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #f1f5f9; }
+    .nav-item { padding: 12px 15px; margin: 5px 0; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: var(--g); }
+    .nav-item:hover, .nav-item.active { background: var(--d); color: #fff; }
+    .nav-item .badge { margin-right: auto; background: var(--p); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+    .main { flex: 1; margin-right: 280px; padding: 25px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .stat-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; }
+    .stat-val { font-size: 28px; font-weight: 800; color: var(--p); }
+    .stat-label { color: var(--g); font-size: 13px; margin-top: 5px; }
+    .table-wrap { background: #fff; border-radius: 12px; overflow-x: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: right; border-bottom: 1px solid #f1f5f9; }
+    th { background: #f8fafc; color: var(--g); font-weight: 600; }
+    tr:hover { background: #fdfbfb; }
+    .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+    .s-نشط { background: #dcfce7; color: #166534; }
+    .s-قيد { background: #fef3c7; color: #92400e; }
+    .s-محظور { background: #fee2e2; color: #991b1b; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+    .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+    .modal-head { display: flex; justify-content: space-between; padding: 20px; border-bottom: 1px solid #e2e8f0; }
+    .modal-body { padding: 25px; }
+    .modal-foot { padding: 20px; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; justify-content: flex-end; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+    .item { background: #f8fafc; padding: 12px; border-radius: 10px; }
+    .item-label { font-size: 12px; color: var(--g); margin-bottom: 4px; }
+    .item-val { font-weight: 600; }
+    #map { height: 450px; border-radius: 12px; margin-bottom: 20px; }
+    .map-container { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .loading { text-align: center; padding: 40px; color: var(--g); }
+    @media(max-width: 768px) { .sidebar { width: 100%; position: relative; } .main { margin-right: 0; } .dashboard { flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <div id="login-screen" class="login-box">
+    <h2 style="margin-bottom: 20px;">🔐 دخول الإدارة</h2>
+    <input type="email" id="adm-email" placeholder="البريد الإلكتروني">
+    <input type="password" id="adm-pass" placeholder="كلمة المرور">
+    <button onclick="window.login()" class="btn btn-primary">دخول</button>
+    <p id="login-msg" style="margin-top: 15px; color: var(--red);"></p>
+  </div>
+
+  <div id="dash-screen" class="dashboard hidden">
+    <div class="sidebar">
+      <h2>⛵ شراع</h2>
+      <div class="nav-item active" onclick="window.nav('overview')">📊 نظرة عامة</div>
+      <div class="nav-item" onclick="window.nav('users')">👥 المستخدمين <span class="badge" id="b-u">0</span></div>
+      <div class="nav-item" onclick="window.nav('drivers')">🚗 السائقين <span class="badge" id="b-d">0</span></div>
+      <div class="nav-item" onclick="window.nav('delivery')">🏍️ ديلفري <span class="badge" id="b-del">0</span></div>
+      <div class="nav-item" onclick="window.nav('stores')">🏪 المتاجر <span class="badge" id="b-s">0</span></div>
+      <div class="nav-item" onclick="window.nav('trips')">🚕 الرحلات <span class="badge" id="b-t">0</span></div>
+      <div class="nav-item" onclick="window.nav('map')">📍 الخريطة</div>
+      <div class="nav-item" onclick="window.nav('revenue')">💰 الإيرادات</div>
+      <div class="nav-item" onclick="window.nav('notifs')">🔔 الإشعارات</div>
+      <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+        <button onclick="window.logout()" class="btn" style="width:100%; background:#f1f5f9;">🚪 خروج</button>
+      </div>
+    </div>
+    <div class="main" id="main-content"></div>
+  </div>
+
+  <div id="modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head"><h3 id="m-title">تفاصيل</h3><button onclick="window.closeM()" style="background:none;font-size:20px;">✕</button></div>
+      <div class="modal-body" id="m-body"></div>
+      <div class="modal-foot" id="m-foot"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const U = "https://qioiiidrwqvwzkveoxnm.supabase.co";
+    const K = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpb2lpaWRyd3F2d3prdmVveG5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDQzNTUsImV4cCI6MjA5MTc4MDM1NX0.NpsoJx30JBHPxzjup256ad7hg3u5WV4zuj-LpIr-uss";
+    const db = supabase.createClient(U, K);
+    let currentSection = 'overview', map = null;
+
+    // ✅ تصحيح 1: دالة الدخول
+    window.login = async function() {
+      const e = document.getElementById('adm-email').value;
+      const p = document.getElementById('adm-pass').value;
+      const msg = document.getElementById('login-msg');
+      msg.innerText = 'جاري...';
+      
+      const { data, error } = await db.auth.signInWithPassword({ email: e, password: p });
+      if (error) { msg.innerText = '❌ بيانات خاطئة'; return; }
+      if (data && data.user) await window.checkAdmin(data.user);
+    };
+
+    // ✅ تصحيح 2: التحقق من المدير
+    window.checkAdmin = async function(u) {
+      const { data: adm, error } = await db.from('admin_users').select('*').eq('email', u.email).single();
+      if (error || !adm || !adm.is_active) { 
+        await db.auth.signOut(); 
+        document.getElementById('login-msg').innerText = '❌ غير مصرح'; 
+        return; 
+      }
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('dash-screen').classList.remove('hidden');
+      window.nav('overview');
+    };
+
+    window.logout = function() { 
+      db.auth.signOut(); 
+      location.reload(); 
+    };
+
+    // ✅ تصحيح 3: التنقل الآمن
+    window.nav = function(section) {
+      currentSection = section;
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      if (typeof event !== 'undefined' && event && event.target) {
+        const clicked = event.target.closest('.nav-item');
+        if (clicked) clicked.classList.add('active');
+      }
+      
+      const titles = { 
+        overview: '📊 نظرة عامة', users: '👥 المستخدمين', drivers: '🚗 السائقين', 
+        delivery: '🏍️ ديلفري', stores: '🏪 المتاجر', trips: '🚕 الرحلات', 
+        map: '📍 الخريطة', revenue: '💰 الإيرادات', notifs: '🔔 الإشعارات' 
+      };
+      
+      document.getElementById('main-content').innerHTML = '<div class="header"><h1>'+titles[section]+'</h1></div><div class="loading">جاري التحميل...</div>';
+      
+      switch(section) { 
+        case 'overview': loadOverview(); break; 
+        case 'users': loadUsers('زبون'); break; 
+        case 'drivers': loadUsers('سائق تكسي'); break; 
+        case 'delivery': loadUsers('ديلفري'); break; 
+        case 'stores': loadStores(); break; 
+        case 'trips': loadTrips(); break; 
+        case 'map': loadMap(); break; 
+        case 'revenue': loadRevenue(); break; 
+        case 'notifs': loadNotifs(); break; 
+      }
+    };
+
+    // دوال تحميل البيانات
+    async function loadOverview() { 
+      const { data: u } = await db.from('profiles').select('*'); 
+      const { data: t } = await db.from('trips').select('*'); 
+      document.getElementById('b-u').innerText = (u||[]).filter(x=>x.role==='زبون').length; 
+      document.getElementById('b-d').innerText = (u||[]).filter(x=>x.role==='سائق تكسي').length; 
+      document.getElementById('b-del').innerText = (u||[]).filter(x=>x.role==='ديلفري').length; 
+      document.getElementById('b-s').innerText = (u||[]).filter(x=>x.role==='متجر').length; 
+      document.getElementById('b-t').innerText = (t||[]).length; 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>📊 نظرة عامة</h1></div><div class="stats"><div class="stat-card"><div class="stat-val">${(u||[]).length}</div><div class="stat-label">المستخدمين</div></div><div class="stat-card"><div class="stat-val">${(u||[]).filter(x=>x.status==='نشط').length}</div><div class="stat-label">نشط</div></div><div class="stat-card"><div class="stat-val">${(u||[]).filter(x=>x.status==='قيد المراجعة').length}</div><div class="stat-label">قيد المراجعة</div></div><div class="stat-card"><div class="stat-val">${(t||[]).length}</div><div class="stat-label">الرحلات</div></div></div><div class="table-wrap"><table><thead><tr><th>المستخدم</th><th>الهاتف</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${(u||[]).slice(0,5).map(x=>`<tr><td>${x.name||'-'}</td><td>${x.phone}</td><td>${x.role}</td><td><span class="status-badge s-${x.status.replace(' ','-')}">${x.status}</span></td><td><button onclick="window.viewUser('${x.id}')" class="btn btn-sm">👁️</button></td></tr>`).join('')}</tbody></table></div>`; 
+    }
+    
+    async function loadUsers(role) { 
+      const { data } = await db.from('profiles').select('*').eq('role', role).order('created_at',{ascending:false}); 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>${role}</h1></div><div class="table-wrap"><table><thead><tr><th>الاسم</th><th>الهاتف</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${(data||[]).map(u=>`<tr><td>${u.name||'-'}</td><td>${u.phone}</td><td><span class="status-badge s-${u.status.replace(' ','-')}">${u.status}</span></td><td><button onclick="window.viewUser('${u.id}')" class="btn btn-sm">👁️ عرض</button></td></tr>`).join('')}</tbody></table></div>`; 
+    }
+    
+    async function loadStores() { 
+      const { data } = await db.from('profiles').select('*').eq('role','متجر'); 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>🏪 المتاجر</h1></div><div class="table-wrap"><table><thead><tr><th>المتجر</th><th>المالك</th><th>الحالة</th></tr></thead><tbody>${(data||[]).map(s=>`<tr><td>${s.store_name||'-'}</td><td>${s.name||'-'}</td><td>${s.store_status}</td></tr>`).join('')}</tbody></table></div>`; 
+    }
+    
+    async function loadTrips() { 
+      const { data } = await db.from('trips').select('*, customer:customer_id(name,phone)').order('created_at',{ascending:false}); 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>🚕 الرحلات</h1></div><div class="table-wrap"><table><thead><tr><th>الزبون</th><th>النوع</th><th>السعر</th><th>الحالة</th></tr></thead><tbody>${(data||[]).map(t=>`<tr><td>${t.customer?.name||'-'}</td><td>${t.service_type}</td><td>${t.final_price} د.ع</td><td>${t.status}</td></tr>`).join('')}</tbody></table></div>`; 
+    }
+    
+    async function loadMap() { 
+      const { data } = await db.from('profiles').select('id,name,latitude,longitude').not('latitude','is',null); 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>📍 الخريطة</h1></div><div class="map-container"><div id="map"></div></div>`; 
+      setTimeout(()=>{ 
+        if(map) map.remove(); 
+        map = L.map('map').setView([30.5085,47.7835],11); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map); 
+        (data||[]).forEach(u=>{ L.marker([u.latitude,u.longitude]).addTo(map).bindPopup(`<b>${u.name||'مستخدم'}</b>`); }); 
+      },100); 
+    }
+    
+    async function loadRevenue() { 
+      const { data } = await db.from('revenues').select('amount'); 
+      const total = data?.reduce((a,b)=>a+(b.amount||0),0)||0; 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>💰 الإيرادات</h1></div><div class="stats"><div class="stat-card"><div class="stat-val">${total.toLocaleString()} د.ع</div><div class="stat-label">إجمالي</div></div></div>`; 
+    }
+    
+    async function loadNotifs() { 
+      const { data } = await db.from('notifications').select('*, profiles(name)').order('created_at',{ascending:false}).limit(10); 
+      document.getElementById('main-content').innerHTML = `<div class="header"><h1>🔔 الإشعارات</h1></div><div class="table-wrap"><table><thead><tr><th>المستخدم</th><th>العنوان</th><th>الرسالة</th></tr></thead><tbody>${(data||[]).map(n=>`<tr><td>${n.profiles?.name||'-'}</td><td>${n.title}</td><td>${n.message}</td></tr>`).join('')}</tbody></table></div>`; 
+    }
+
+    // ✅ تصحيح 4: عرض تفاصيل المستخدم
+    window.viewUser = async function(id) {
+      const { data: u, error } = await db.from('profiles').select('*').eq('id',id).single();
+      if(error || !u) return;
+      
+      document.getElementById('m-title').innerText = u.name||'مستخدم';
+      document.getElementById('m-body').innerHTML = `
+        <div class="grid-2">
+          <div class="item"><div class="item-label">الهاتف</div><div class="item-val">${u.phone}</div></div>
+          <div class="item"><div class="item-label">الحالة</div><div class="item-val">${u.status}</div></div>
+          <div class="item"><div class="item-label">الدور</div><div class="item-val">${u.role}</div></div>
+        </div>
+        ${u.role !== 'زبون' ? `<div style="margin-top:15px;padding:15px;background:#f8fafc;border-radius:10px;"><div style="font-weight:600;margin-bottom:10px;">🔐 تفعيل الاشتراك</div><select id="sub-months"><option value="1">1 شهر</option><option value="3">3 أشهر</option><option value="6">6 أشهر</option></select></div>` : ''}
+      `;
+      document.getElementById('m-foot').innerHTML = `
+        ${u.role !== 'زبون' ? `<button onclick="window.activateUser('${id}')" class="btn btn-success">✅ تفعيل مع اشتراك</button>` : ''}
+        <button onclick="window.updateStatus('${id}','نشط')" class="btn btn-success">✅ تفعيل</button>
+        <button onclick="window.updateStatus('${id}','محظور')" class="btn btn-danger">🚫 حظر</button>
+        <button onclick="window.closeM()" class="btn">إغلاق</button>
+      `;
+      document.getElementById('modal').classList.remove('hidden');
+    };
+
+    window.activateUser = async function(userId) {
+      const months = document.getElementById('sub-months').value;
+      const { error } = await db.rpc('activate_subscription', { p_user_id: userId, p_months: parseInt(months) });
+      if(error) { alert('❌ '+error.message); return; }
+      alert(`✅ تم التفعيل بنجاح! الاشتراك: ${months} شهر`);
+      window.closeM();
+      window.nav(currentSection);
+    };
+
+    window.updateStatus = async function(id, st) {
+      if(!confirm(`تغيير الحالة إلى "${st}"؟`)) return;
+      await db.from('profiles').update({status:st}).eq('id',id);
+      alert('✅ تم');
+      window.closeM();
+      window.nav(currentSection);
+    };
+
+    window.closeM = function() { 
+      document.getElementById('modal').classList.add('hidden'); 
+    };
+
+    // ✅ تصحيح 5: التهيئة عند التحميل
+    window.onload = async () => {
+      const { data: { session } } = await db.auth.getSession();
+      if(session && session.user) await window.checkAdmin(session.user);
+    };
+  </script>
+</body>
+</html>

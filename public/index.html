@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>شراع | Shira Platform</title>
+  <!-- ملف التنسيق الخارجي -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- مكتبة الخرائط Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- خطوط عربية (اختياري) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap">
+</head>
+<body>
+
+  <!-- ========================================== -->
+  <!-- 1. شاشة بوابة الموقع (GPS Gate) -->
+  <!-- تظهر قبل أي شيء وتتطلب تفعيل الموقع -->
+  <!-- ========================================== -->
+  <div id="gate-gps" class="screen active">
+    <div class="gate-content">
+      <div class="icon">📍</div>
+      <h2>إذن الموقع مطلوب</h2>
+      <p>لتشغيل التطبيق بشكل آمن ودقيق، يجب تفعيل خدمات الموقع (GPS).</p>
+      <button id="enable-gps-btn" class="btn-primary">تفعيل الموقع ومتابعة</button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 2. شاشة حالة الحساب (مراجعة / حظر) -->
+  <!-- ========================================== -->
+  <div id="gate-status" class="screen hidden">
+    <div class="gate-content">
+      <div class="icon" id="status-icon">⏳</div>
+      <h2 id="status-title">قيد المراجعة</h2>
+      <p id="status-msg">جاري مراجعة طلبك من قبل الإدارة...</p>
+      <div class="contact-actions">
+        <button onclick="Utils.openWhatsApp()" class="btn-outline">💬 واتساب الإدارة</button>
+        <button onclick="Utils.openInAppChat()" class="btn-outline">📨 مراسلة داخل التطبيق</button>
+      </div>
+      <button onclick="App.logout()" class="btn-danger mt-2">خروج</button>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- 3. الحاوية الرئيسية للتطبيق (SPA Container) -->
+  <!-- ========================================== -->
+  <div id="app-container" class="screen hidden">
+    
+    <!-- الهيدر العلوي -->
+    <header id="app-header">
+      <button id="back-btn" class="icon-btn hidden">↩️</button>
+      <h1 id="header-title">شراع</h1>
+      <div class="header-actions">
+        <button id="notif-btn" class="icon-btn">🔔</button>
+        <button id="profile-btn" class="icon-btn">👤</button>
+      </div>
+    </header>
+
+    <!-- منطقة عرض المحتوى المتغير (Router View) -->
+    <main id="app-view">
+      <!-- هنا يتم حقن الصفحات (تسجيل دخول، الرئيسية، الخريطة، إلخ) -->
+    </main>
+
+    <!-- شريط التنقل السفلي (يظهر فقط للمستخدمين المسجلين) -->
+    <nav id="bottom-nav" class="hidden">
+      <button data-route="home" class="nav-item active">🏠 الرئيسية</button>
+      <button data-route="orders" class="nav-item">📦 طلباتي</button>
+      <button data-route="chat" class="nav-item">💬 الرسائل</button>
+      <button data-route="profile" class="nav-item">👤 الملف</button>
+    </nav>
+  </div>
+
+  <!-- نافذة منبثقة عامة (Modal) -->
+  <div id="global-modal" class="modal hidden">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- السكربتات (يجب تحميلها بهذا الترتيب) -->
+  <!-- ========================================== -->
+  
+  <!-- 1. مكتبة الخرائط -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- 2. مكتبة قاعدة البيانات -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- 3. ملفات المشروع -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
