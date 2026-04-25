@@ -1,6 +1,7 @@
 // ==========================================
 // شراع | Shira Platform - Core Application Engine v3.0
 // ✅ التحديث: التقييم، الرسائل، الهيكل العظمي، عن شراع، تواصل معنا، تحسينات الواجهة
+// ⚠️ ملاحظة: تم دمج دوال Utils في هذا الملف لتجنب التعارض مع utils.js
 // ==========================================
 
 const App = {
@@ -592,7 +593,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr, data: upData } = await App.db.storage
+        const { error: upErr,  upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         
@@ -606,10 +607,10 @@ const Auth = {
       }
     }
 
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: { data: { name, phone, role, gender, age: parseInt(age) } }
+      options: {  { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -633,7 +634,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -666,7 +667,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
           
@@ -700,7 +701,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -1087,7 +1088,7 @@ const AboutShira = {
 };
 
 // ==========================================
-// 🛠️ Utils Module - إضافات جديدة
+// 🛠️ Utils Module - موحد (إضافة ضرورية لحل التعارض)
 // ==========================================
 const Utils = {
   compressImage: async (file, maxWidth, quality) => {
@@ -1116,7 +1117,6 @@ const Utils = {
   },
   
   openWhatsApp: () => {
-    // ✅ فتح واتساب مع الرقم المحدد
     window.open('https://wa.me/9647722507019', '_blank');
   },
   
@@ -1124,7 +1124,6 @@ const Utils = {
     Messages.openChatModal();
   },
   
-  // ✅ دوال الهيكل العظمي (Skeleton Loading)
   showSkeleton: (selector) => {
     const el = document.querySelector(selector);
     if (!el) return;
@@ -1138,7 +1137,6 @@ const Utils = {
   
   hideSkeleton: (selector) => {
     // يتم استدعاؤها تلقائياً بعد تحميل المحتوى الفعلي
-    // لا حاجة لإخفاء يدوي هنا لأن المحتوى الجديد سيحل محل الهيكل
   }
 };
 
