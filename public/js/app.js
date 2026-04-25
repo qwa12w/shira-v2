@@ -1,6 +1,6 @@
 // ==========================================
 // شراع | Shira Platform - Core Application Engine
-// ✅ النسخة النهائية: كل الأدوار تبقى في التطبيق الرئيسي
+// ✅ النسخة النهائية المصححة: كل الأدوار تبقى في التطبيق الرئيسي
 // ==========================================
 
 const App = {
@@ -531,10 +531,11 @@ const Auth = {
       }
     }
 
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ تم تصحيح هذا السطر: options: { data: { ... } }
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {  { name, phone, role, gender, age: parseInt(age) } }
+      options: { data: { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -558,7 +559,8 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          // ✅ تم تصحيح: data: upData
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -591,7 +593,8 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          // ✅ تم تصحيح: data: upData
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
           
@@ -625,7 +628,8 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          // ✅ تم تصحيح: data: upData
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
