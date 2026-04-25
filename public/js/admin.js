@@ -1,11 +1,12 @@
 // ==========================================
-// شراع | Shira Platform - Admin Module v2.2
-// ✅ التحديث: الزبائن، العدادات، قيد المراجعة، المدراء، تفاصيل المستخدم
+// شراع | Shira Platform - Admin Module v2.3
+// ✅ التحديث: إصلاح تحقق المالك، العدادات، قيد المراجعة، المدراء، تفاصيل المستخدم
+// ⚠️ ملاحظة: كلمة المرور تُدار عبر Supabase Authentication وليست في هذا الملف
 // ==========================================
 
 const Admin = {
   db: null,
-  ownerEmail: "aliiraqi22507019@gmail.com",
+  ownerEmail: "aliiraqi22507019@gmail.com", // ✅ بريد المالك الرئيسي
   currentAdmin: null,
   map: null,
   userMarkers: {},
@@ -43,14 +44,19 @@ const Admin = {
         const profRes = await Admin.db.from('profiles').select('*').eq('id', session.user.id).single();
         const profile = profRes.data;
         
-        if (profile && (profile.email === Admin.ownerEmail || profile.role === 'admin')) {
+        // ✅ استخدام إيميل الجلسة الموثّق من Supabase (أدق من ملف البروفايل)
+        const sessionEmail = session.user.email?.toLowerCase() || '';
+        const isOwner = sessionEmail === Admin.ownerEmail.toLowerCase();
+        
+        if (profile && (isOwner || profile.role === 'admin')) {
           Admin.currentAdmin = profile;
-          Admin.permissions.canManageManagers = (profile.email === Admin.ownerEmail);
+          Admin.permissions.canManageManagers = isOwner; // ✅ المالك فقط يدير المدراء
+          
           document.getElementById('login-overlay').classList.add('hidden');
           document.getElementById('admin-panel').classList.remove('hidden');
           Admin.renderSidebar();
           Admin.render('dashboard');
-          Admin.startCountersUpdate(); // ✅ بدء تحديث العدادات
+          Admin.startCountersUpdate();
           return;
         }
       }
@@ -296,7 +302,7 @@ const Admin = {
   viewUserDetails: async (userId) => {
     try {
       Admin.ensureDb();
-      const {  user } = await Admin.db.from('profiles').select('*').eq('id', userId).single();
+      const { data: user } = await Admin.db.from('profiles').select('*').eq('id', userId).single();
       if (!user) return;
 
       const modal = document.createElement('div');
@@ -351,7 +357,7 @@ const Admin = {
 
   // ✅ تعديل بيانات المستخدم
   editUserModal: async (userId) => {
-    const {  user } = await Admin.db.from('profiles').select('*').eq('id', userId).single();
+    const { data: user } = await Admin.db.from('profiles').select('*').eq('id', userId).single();
     if (!user) return;
     
     const newName = prompt('الاسم الجديد:', user.name);
@@ -551,7 +557,7 @@ const Admin = {
 
   // ✅ تحميل قائمة المدراء
   loadManagersList: async () => {
-    const {  data } = await Admin.db.from('profiles')
+    const { data } = await Admin.db.from('profiles')
       .select('id, name, phone, email, role, admin_permissions, work_hours')
       .eq('role', 'admin')
       .neq('email', Admin.ownerEmail);
@@ -600,7 +606,7 @@ const Admin = {
     const workHours = start && end ? { start, end } : null;
     
     // إنشاء الحساب في auth
-    const {  authData, error: authErr } = await Admin.db.auth.signUp({
+    const { data: authData, error: authErr } = await Admin.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass
     });
@@ -625,7 +631,7 @@ const Admin = {
 
   // ✅ تعديل مدير
   editManager: async (managerId) => {
-    const {  mgr } = await Admin.db.from('profiles').select('*').eq('id', managerId).single();
+    const { data: mgr } = await Admin.db.from('profiles').select('*').eq('id', managerId).single();
     if (!mgr) return;
     
     const newName = prompt('الاسم الجديد:', mgr.name);
