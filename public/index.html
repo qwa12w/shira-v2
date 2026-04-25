@@ -3,26 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#f59e0b">
   <title>شراع | Shira Platform</title>
-  <!-- ملف التنسيق الخارجي -->
-  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- خطوط عربية حديثة -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  
+  <!-- مكتبة الأيقونات -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
   <!-- مكتبة الخرائط Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- خطوط عربية (اختياري) -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap">
+  
+  <!-- ملفات التصميم -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/modern-ui.css">
 </head>
 <body>
 
   <!-- ========================================== -->
   <!-- 1. شاشة بوابة الموقع (GPS Gate) -->
-  <!-- تظهر قبل أي شيء وتتطلب تفعيل الموقع -->
   <!-- ========================================== -->
   <div id="gate-gps" class="screen active">
-    <div class="gate-content">
-      <div class="icon">📍</div>
+    <div class="gate-content glass-panel">
+      <div class="icon" style="font-size:3rem; margin-bottom:1rem;">📍</div>
       <h2>إذن الموقع مطلوب</h2>
-      <p>لتشغيل التطبيق بشكل آمن ودقيق، يجب تفعيل خدمات الموقع (GPS).</p>
-      <button id="enable-gps-btn" class="btn-primary">تفعيل الموقع ومتابعة</button>
+      <p style="color:var(--text-muted); margin:1rem 0;">لتشغيل التطبيق بشكل آمن ودقيق، يجب تفعيل خدمات الموقع (GPS).</p>
+      <button id="enable-gps-btn" class="btn btn-primary">تفعيل الموقع ومتابعة</button>
     </div>
   </div>
 
@@ -30,15 +39,15 @@
   <!-- 2. شاشة حالة الحساب (مراجعة / حظر) -->
   <!-- ========================================== -->
   <div id="gate-status" class="screen hidden">
-    <div class="gate-content">
-      <div class="icon" id="status-icon">⏳</div>
+    <div class="gate-content glass-panel">
+      <div class="icon" id="status-icon" style="font-size:3rem; margin-bottom:1rem;">⏳</div>
       <h2 id="status-title">قيد المراجعة</h2>
-      <p id="status-msg">جاري مراجعة طلبك من قبل الإدارة...</p>
-      <div class="contact-actions">
-        <button onclick="Utils.openWhatsApp()" class="btn-outline">💬 واتساب الإدارة</button>
-        <button onclick="Utils.openInAppChat()" class="btn-outline">📨 مراسلة داخل التطبيق</button>
+      <p id="status-msg" style="color:var(--text-muted); margin:1rem 0;">جاري مراجعة طلبك من قبل الإدارة...</p>
+      <div class="contact-actions" style="display:flex; gap:10px; margin-top:1rem;">
+        <button onclick="Utils.openWhatsApp()" class="btn btn-outline">💬 واتساب</button>
+        <button onclick="Utils.openInAppChat()" class="btn btn-secondary">📨 مراسلة</button>
       </div>
-      <button onclick="App.logout()" class="btn-danger mt-2">خروج</button>
+      <button onclick="App.logout()" class="btn btn-danger mt-2">خروج</button>
     </div>
   </div>
 
@@ -48,34 +57,49 @@
   <div id="app-container" class="screen hidden">
     
     <!-- الهيدر العلوي -->
-    <header id="app-header">
-      <button id="back-btn" class="icon-btn hidden">↩️</button>
-      <h1 id="header-title">شراع</h1>
-      <div class="header-actions">
-        <button id="notif-btn" class="icon-btn">🔔</button>
-        <button id="profile-btn" class="icon-btn">👤</button>
+    <header id="app-header" class="glass-panel" style="border-radius:0; border-left:0; border-right:0; margin:0; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100;">
+      <button id="back-btn" class="icon-btn hidden" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">↩️</button>
+      <h1 id="header-title" style="margin:0; font-size:1.1rem; font-weight:700;">شراع</h1>
+      <div class="header-actions" style="display:flex; gap:12px;">
+        <button id="notif-btn" class="icon-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer; position:relative;">
+          🔔
+          <span id="notif-badge" class="hidden" style="position:absolute; top:-4px; right:-4px; background:#ef4444; color:white; font-size:10px; width:16px; height:16px; border-radius:50%; display:flex; align-items:center; justify-content:center;">1</span>
+        </button>
+        <button id="profile-btn" class="icon-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">👤</button>
       </div>
     </header>
 
     <!-- منطقة عرض المحتوى المتغير (Router View) -->
-    <main id="app-view">
-      <!-- هنا يتم حقن الصفحات (تسجيل دخول، الرئيسية، الخريطة، إلخ) -->
+    <main id="app-view" style="padding:16px; min-height:calc(100vh - 140px);">
+      <!-- هنا يتم حقن الصفحات ديناميكياً -->
     </main>
 
-    <!-- شريط التنقل السفلي (يظهر فقط للمستخدمين المسجلين) -->
-    <nav id="bottom-nav" class="hidden">
-      <button data-route="home" class="nav-item active">🏠 الرئيسية</button>
-      <button data-route="orders" class="nav-item">📦 طلباتي</button>
-      <button data-route="chat" class="nav-item">💬 الرسائل</button>
-      <button data-route="profile" class="nav-item">👤 الملف</button>
+    <!-- شريط التنقل السفلي -->
+    <nav id="bottom-nav" class="hidden glass-panel" style="border-radius:0; border-left:0; border-right:0; margin:0; padding:8px; display:flex; justify-content:space-around; position:fixed; bottom:0; left:0; right:0; z-index:100;">
+      <button data-route="home" class="nav-item active" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <span style="font-size:1.3rem;">🏠</span>
+        <span>الرئيسية</span>
+      </button>
+      <button data-route="orders" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <span style="font-size:1.3rem;">📦</span>
+        <span>طلباتي</span>
+      </button>
+      <button data-route="chat" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <span style="font-size:1.3rem;">💬</span>
+        <span>الرسائل</span>
+      </button>
+      <button data-route="profile" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
+        <span style="font-size:1.3rem;">👤</span>
+        <span>الملف</span>
+      </button>
     </nav>
   </div>
 
   <!-- نافذة منبثقة عامة (Modal) -->
-  <div id="global-modal" class="modal hidden">
-    <div class="modal-content">
-      <span class="modal-close">&times;</span>
-      <div id="modal-body"></div>
+  <div id="global-modal" class="modal hidden" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;">
+    <div class="modal-content glass-panel" style="width:100%; max-width:500px; max-height:90vh; overflow-y:auto; position:relative; margin:auto;">
+      <span class="modal-close" style="position:absolute; top:12px; left:16px; font-size:1.5rem; cursor:pointer; background:none; border:none;">&times;</span>
+      <div id="modal-body" style="padding-top:20px;"></div>
     </div>
   </div>
 
