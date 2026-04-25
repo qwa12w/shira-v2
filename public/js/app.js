@@ -60,6 +60,12 @@ const App = {
       
       if (!profile) return App.hardLogout();
 
+      // ✅ إضافة جديدة: توجيه المدير إلى لوحة الإدارة فوراً
+      if (profile.role === 'admin') {
+        window.location.href = '/admin.html';
+        return;
+      }
+
       if (profile.pending_deletion_at) {
         const delDate = new Date(profile.pending_deletion_at);
         const now = new Date();
