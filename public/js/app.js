@@ -1,6 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine
-// ✅ النسخة النهائية المصححة: كل الأدوار تبقى في التطبيق الرئيسي
+// شراع | Shira Platform - Core Application Engine v3.0
+// ✅ التحديث: التقييم، الرسائل، الهيكل العظمي، عن شراع، تواصل معنا، تحسينات الواجهة
 // ==========================================
 
 const App = {
@@ -18,12 +18,19 @@ const App = {
 
   init: async () => {
     try {
+      // ✅ عرض الهيكل العظمي أثناء التحميل الأولي
+      Utils.showSkeleton('#app-view');
+      
       App.db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
       App.setupListeners();
       try { await App.checkGPS(); } catch (e) { console.warn("⚠️ GPS غير متاح."); }
       await App.checkSession();
+      
+      // ✅ إخفاء الهيكل العظمي بعد اكتمال التحميل
+      Utils.hideSkeleton('#app-view');
     } catch (err) {
       console.error("❌ Init Error:", err);
+      Utils.hideSkeleton('#app-view');
       alert('حدث خطأ أثناء تحميل التطبيق. يرجى تحديث الصفحة.');
     }
   },
@@ -49,19 +56,23 @@ const App = {
 
   checkSession: async () => {
     try {
+      Utils.showSkeleton('#app-view');
       const sessionRes = await App.db.auth.getSession();
       const session = sessionRes.data ? sessionRes.data.session : null;
       
-      if (!session) return App.router('role-select');
+      if (!session) {
+        Utils.hideSkeleton('#app-view');
+        return App.router('role-select');
+      }
 
       App.user = session.user;
       const profRes = await App.db.from('profiles').select('*').eq('id', App.user.id).single();
       const profile = profRes.data;
       
-      if (!profile) return App.hardLogout();
-
-      // ✅ تم إزالة توجيه المدير إلى admin.html
-      // الآن جميع المستخدمين (بما فيهم المدير) يبقون في التطبيق الرئيسي
+      if (!profile) {
+        Utils.hideSkeleton('#app-view');
+        return App.hardLogout();
+      }
 
       if (profile.pending_deletion_at) {
         const delDate = new Date(profile.pending_deletion_at);
@@ -81,13 +92,21 @@ const App = {
       localStorage.setItem('lastRole', profile.role || '');
       localStorage.setItem('lastRoute', (profile.role === 'زبون') ? 'home' : 'dashboard');
 
-      if (profile.status === 'قيد المراجعة') return App.showStatusGate('⏳', 'قيد المراجعة', 'جاري مراجعة طلبك.');
-      if (profile.status === 'محظور') return App.showStatusGate('🚫', 'تم حظر الحساب', 'تم إيقاف حسابك.');
+      if (profile.status === 'قيد المراجعة') {
+        Utils.hideSkeleton('#app-view');
+        return App.showStatusGate('⏳', 'قيد المراجعة', 'جاري مراجعة طلبك.');
+      }
+      if (profile.status === 'محظور') {
+        Utils.hideSkeleton('#app-view');
+        return App.showStatusGate('🚫', 'تم حظر الحساب', 'تم إيقاف حسابك.');
+      }
       
       App.startLiveTracking();
+      Utils.hideSkeleton('#app-view');
       App.router(App.getInitialRoute());
     } catch (err) {
       console.error('Session check error:', err);
+      Utils.hideSkeleton('#app-view');
       App.hardLogout();
     }
   },
@@ -172,8 +191,12 @@ const App = {
       };
     }
 
+    // ✅ عرض الهيكل العظمي أثناء تغيير الصفحة
+    Utils.showSkeleton('#app-view');
+    
     if (App.routes[route]) {
       container.innerHTML = App.routes[route](payload);
+      Utils.hideSkeleton('#app-view');
     } else {
       switch (route) {
         case 'role-select': container.innerHTML = Views.roleSelect(); if (headerTitle) headerTitle.innerText = 'اختر القسم'; break;
@@ -186,6 +209,7 @@ const App = {
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
+      Utils.hideSkeleton('#app-view');
     }
     App.currentRoute = route;
     App.updateNavActive(route);
@@ -219,6 +243,12 @@ const App = {
         if (target && target.dataset.route) App.router(target.dataset.route);
       });
     }
+    
+    // ✅ مستمع للنوافذ المنبثقة
+    const modalClose = document.querySelector('.modal-close');
+    if (modalClose) {
+      modalClose.onclick = () => document.getElementById('global-modal')?.classList.add('hidden');
+    }
   },
 
   startLiveTracking: () => {
@@ -239,21 +269,26 @@ const App = {
   }
 };
 
+// ==========================================
+// 🎨 Views Module - مع تحسينات الواجهة الجديدة
+// ==========================================
 const Views = {
   roleSelect: () => {
-    return '<div class="role-card" onclick="App.router(\'register\', \'زبون\')"><div class="icon">👤</div><h3>زبون</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'register\', \'سائق تكسي\')"><div class="icon">🚗</div><h3>سائق تكسي</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'register\', \'سائق توك توك\')"><div class="icon">🛺</div><h3>سائق توك توك</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'register\', \'صاحب متجر\')"><div class="icon">🏪</div><h3>صاحب متجر</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'register\', \'دلفري\')"><div class="icon">🏍️</div><h3>دلفري</h3></div>' +
-      '<button onclick="App.router(\'login\')" class="btn-outline mt-2">لديك حساب؟ سجل دخول</button>';
+    return `<div class="card" onclick="App.router('register', 'زبون')"><div class="icon">👤</div><h3>زبون</h3></div>` +
+      `<div class="card" onclick="App.router('register', 'سائق تكسي')"><div class="icon">🚗</div><h3>سائق تكسي</h3></div>` +
+      `<div class="card" onclick="App.router('register', 'سائق توك توك')"><div class="icon">🛺</div><h3>سائق توك توك</h3></div>` +
+      `<div class="card" onclick="App.router('register', 'صاحب متجر')"><div class="icon">🏪</div><h3>صاحب متجر</h3></div>` +
+      `<div class="card" onclick="App.router('register', 'دلفري')"><div class="icon">🏍️</div><h3>دلفري</h3></div>` +
+      `<button onclick="App.router('login')" class="btn btn-outline mt-2">لديك حساب؟ سجل دخول</button>`;
   },
   
   login: () => {
-    return '<div class="form-group"><label>رقم الهاتف</label><input type="tel" id="login-phone" class="input-field" placeholder="07..."></div>' +
-      '<div class="form-group"><label>كلمة المرور</label><input type="password" id="login-pass" class="input-field"></div>' +
-      '<button onclick="Auth.login()" class="btn-primary">دخول</button>' +
-      '<button onclick="App.router(\'role-select\')" class="btn-outline mt-2">إنشاء حساب جديد</button>';
+    return `<div class="card glass-panel">
+      <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="login-phone" class="input-field" placeholder="07..."></div>
+      <div class="form-group"><label>كلمة المرور</label><input type="password" id="login-pass" class="input-field"></div>
+      <button onclick="Auth.login()" class="btn btn-primary">دخول</button>
+      <button onclick="App.router('role-select')" class="btn btn-outline mt-2">إنشاء حساب جديد</button>
+    </div>`;
   },
   
   register: (role) => {
@@ -296,7 +331,7 @@ const Views = {
       'زبون': '',
       'سائق تكسي': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--p);">🚗 بيانات السيارة</h4>
+        <h4 style="margin-bottom: 15px; color: var(--primary);">🚗 بيانات السيارة</h4>
         <div class="form-group">
           <label>رقم السيارة (اللوحة) *</label>
           <input type="text" id="reg-plate" class="input-field" placeholder="مثال: ب غ د 123" required>
@@ -312,12 +347,12 @@ const Views = {
         <div class="form-group">
           <label>صور السيارة (من عدة زوايا) *</label>
           <input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
+          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
       'سائق توك توك': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--p);">🛺 بيانات التوك توك</h4>
+        <h4 style="margin-bottom: 15px; color: var(--primary);">🛺 بيانات التوك توك</h4>
         <div class="form-group">
           <label>رقم التوك توك *</label>
           <input type="text" id="reg-plate" class="input-field" placeholder="رقم المركبة" required>
@@ -333,12 +368,12 @@ const Views = {
         <div class="form-group">
           <label>صور التوك توك *</label>
           <input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
+          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
       'صاحب متجر': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--p);">🏪 بيانات المتجر</h4>
+        <h4 style="margin-bottom: 15px; color: var(--primary);">🏪 بيانات المتجر</h4>
         <div class="form-group">
           <label>نوع المتجر *</label>
           <select id="reg-store-type" class="input-field" required>
@@ -363,12 +398,12 @@ const Views = {
         <div class="form-group">
           <label>صور المتجر (الواجهة والداخل) *</label>
           <input type="file" id="reg-store-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
+          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
       'دلفري': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--p);">🏍️ بيانات الدراجة</h4>
+        <h4 style="margin-bottom: 15px; color: var(--primary);">🏍️ بيانات الدراجة</h4>
         <div class="form-group">
           <label>نوع الدراجة *</label>
           <input type="text" id="reg-bike-type" class="input-field" placeholder="مثال: هوندا 150" required>
@@ -388,7 +423,7 @@ const Views = {
         <div class="form-group">
           <label>صور الدراجة *</label>
           <input type="file" id="reg-bike-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
+          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `
     };
@@ -400,23 +435,23 @@ const Views = {
         ${commonFields}
         ${extraFields}
       </form>
-      <button onclick="Auth.register('${role}')" class="btn-primary mt-2">✅ إنشاء الحساب</button>
-      <button onclick="App.router('login')" class="btn-outline">⬅️ رجوع لتسجيل الدخول</button>
+      <button onclick="Auth.register('${role}')" class="btn btn-primary mt-2">✅ إنشاء الحساب</button>
+      <button onclick="App.router('login')" class="btn btn-outline">⬅️ رجوع لتسجيل الدخول</button>
     `;
   },
   
   home: () => {
-    return '<div class="role-card" onclick="App.router(\'request-ride\', \'تاكسي\')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'request-ride\', \'توك توك\')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>' +
-      '<div class="role-card" onclick="App.router(\'shopping\')"><div class="icon">🛒</div><h3>تسوق</h3></div>';
+    return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
+      `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
+      `<div class="card" onclick="App.router('shopping')"><div class="icon">🛒</div><h3>تسوق</h3></div>`;
   },
   
   shopping: () => {
-    return '<div class="text-center" style="padding: 40px 20px;">' +
-      '<div style="font-size: 60px; margin-bottom: 20px;">🛒</div>' +
-      '<h2 style="margin-bottom: 15px;">قسم التسوق</h2>' +
-      '<p style="color: var(--g); margin-bottom: 30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>' +
-      '<button onclick="App.router(\'home\')" class="btn-outline">العودة للرئيسية</button></div>';
+    return `<div class="text-center" style="padding: 40px 20px;">
+      <div style="font-size: 60px; margin-bottom: 20px;">🛒</div>
+      <h2 style="margin-bottom: 15px;">قسم التسوق</h2>
+      <p style="color: var(--text-muted); margin-bottom: 30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
+      <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
   },
   
   dashboard: () => {
@@ -426,18 +461,18 @@ const Views = {
     }
     const name = App.profile.name || 'مستخدم';
     const role = App.profile.role || '';
-    return '<div class="list-item"><h3>👋 ' + name + '</h3><p>الدور: <span class="badge badge-info">' + role + '</span></p></div>' +
-      '<div class="role-card" onclick="App.router(\'profile\')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>';
+    return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span></p></div>` +
+      `<div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
   
   requestRide: (type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
-    return '<div class="map-wrapper"><div id="map"></div></div>' +
-      '<div style="background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; text-align: center;">📍 اضغط على الخريطة لتحديد وجهتك</div>' +
-      '<div class="form-group"><label>الوجهة المحددة</label><input type="text" id="ride-dest" class="input-field" placeholder="اضغط على الخريطة أو اكتب العنوان" readonly></div>' +
-      '<div class="form-group"><label>نوع المركبة</label><input type="text" value="' + type + '" class="input-field" readonly></div>' +
-      '<div class="list-item" style="display:flex; justify-content:space-between; align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--p); font-size:20px;"><span id="price-val">' + basePrice + '</span> د.ع</strong></div>' +
-      '<button onclick="Trips.request(\'' + type + '\')" class="btn-primary">🚀 تأكيد الرحلة</button>';
+    return `<div class="map-wrapper" style="height:300px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>` +
+      `<div style="background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; text-align: center;">📍 اضغط على الخريطة لتحديد وجهتك</div>` +
+      `<div class="form-group"><label>الوجهة المحددة</label><input type="text" id="ride-dest" class="input-field" placeholder="اضغط على الخريطة أو اكتب العنوان" readonly></div>` +
+      `<div class="form-group"><label>نوع المركبة</label><input type="text" value="${type}" class="input-field" readonly></div>` +
+      `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--primary); font-size:20px;"><span id="price-val">${basePrice}</span> د.ع</strong></div>` +
+      `<button onclick="Trips.request('${type}')" class="btn btn-primary">🚀 تأكيد الرحلة</button>`;
   },
   
   profile: () => {
@@ -450,6 +485,8 @@ const Views = {
     const phone = App.profile.phone || '';
     const role = App.profile.role || '';
     const profileImage = App.profile.profile_image;
+    const avgRating = App.profile.avg_rating || 0;
+    const ratingCount = App.profile.rating_count || 0;
     
     const avatarUrl = profileImage 
       ? profileImage 
@@ -457,17 +494,55 @@ const Views = {
     
     const fallbackSvg = 'image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1OWUwYiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkqQ8L3RleHQ+PC9zdmc+';
     
-    return '<div class="text-center mb-2">' +
-      '<img src="' + avatarUrl + '" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--p)" onerror="this.src=\'' + fallbackSvg + '\'">' +
-      '<h2 class="mt-2">' + name + '</h2>' +
-      '<p>' + phone + '</p>' +
-      '<p style="color: var(--g); font-size: 14px; margin-top: 5px;">' + role + '</p>' +
-      '</div>' +
-      '<button onclick="Profile.edit()" class="btn-primary mb-2">✏️ تعديل الملف الشخصي</button>' +
-      '<button onclick="App.secureLogout()" class="btn-danger">🚪 خروج آمن</button>';
+    // ✅ قسم التواصل والدعم (جديد)
+    const supportSection = `
+      <div class="card glass-panel" style="margin-top:20px;">
+        <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:8px;">
+          <i class="fas fa-headset"></i> الدعم والمساعدة
+        </h4>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="padding:10px; font-size:13px;">
+            <i class="fab fa-whatsapp"></i> واتساب
+          </button>
+          <button onclick="Messages.openChatModal()" class="btn btn-secondary" style="padding:10px; font-size:13px;">
+            <i class="fas fa-comment"></i> مراسلة
+          </button>
+        </div>
+        <button onclick="AboutShira.showModal()" class="btn btn-outline mt-2" style="padding:10px; font-size:13px;">
+          <i class="fas fa-info-circle"></i> عن شراع
+        </button>
+      </div>
+    `;
+    
+    // ✅ قسم التقييم (للسائقين والمتاجر والدلفري فقط)
+    const ratingSection = (role !== 'زبون' && role !== 'admin' && role !== 'owner') ? `
+      <div class="card glass-panel" style="text-align:center;">
+        <h4 style="margin-bottom:10px;">⭐ تقييمك العام</h4>
+        <div class="rating-stars" style="font-size:1.5rem; margin:10px 0;">
+          ${Rating.renderStars(avgRating)}
+        </div>
+        <p style="color:var(--text-muted); font-size:13px;">
+          ${avgRating.toFixed(1)} من 5 • ${ratingCount} تقييم
+        </p>
+      </div>
+    ` : '';
+    
+    return `<div class="text-center mb-2">
+      <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
+      <h2 class="mt-2">${name}</h2>
+      <p style="color:var(--text-muted);">${phone}</p>
+      <p style="color: var(--primary); font-size: 14px; margin-top: 5px; font-weight:600;">${role}</p>
+    </div>
+    ${ratingSection}
+    <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
+    <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
+    ${supportSection}`;
   }
 };
 
+// ==========================================
+// 🔐 Auth Module
+// ==========================================
 const Auth = {
   login: async () => {
     const phoneInput = document.getElementById('login-phone');
@@ -531,7 +606,6 @@ const Auth = {
       }
     }
 
-    // ✅ تم تصحيح هذا السطر: options: { data: { ... } }
     const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
@@ -559,7 +633,6 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ تم تصحيح: data: upData
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
@@ -593,7 +666,6 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ تم تصحيح: data: upData
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
@@ -628,7 +700,6 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ تم تصحيح: data: upData
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
@@ -678,6 +749,9 @@ const Auth = {
   }
 };
 
+// ==========================================
+// 🗺️ MapUtils Module
+// ==========================================
 const MapUtils = {
   init: (serviceType) => {
     if (App.map) { App.map.remove(); App.map = null; }
@@ -735,6 +809,9 @@ const MapUtils = {
   }
 };
 
+// ==========================================
+// 📦 Trips Module
+// ==========================================
 const Trips = {
   request: async (type) => {
     const destInput = document.getElementById('ride-dest');
@@ -761,6 +838,9 @@ const Trips = {
   }
 };
 
+// ==========================================
+// 👤 Profile Module
+// ==========================================
 const Profile = {
   edit: () => {
     if (!App.profile) return alert('⚠️ البيانات غير محملة');
@@ -783,6 +863,288 @@ const Profile = {
   }
 };
 
+// ==========================================
+// ⭐ Rating Module - جديد
+// ==========================================
+const Rating = {
+  // عرض النجوم بصرياً
+  renderStars: (avgRating) => {
+    const fullStars = Math.floor(avgRating);
+    const hasHalf = avgRating % 1 >= 0.5;
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) html += '⭐';
+      else if (i === fullStars && hasHalf) html += '🌟';
+      else html += '☆';
+    }
+    return html;
+  },
+  
+  // عرض نموذج التقييم
+  showRatingModal: (tripId, revieweeId, revieweeName, onComplete) => {
+    const modal = document.getElementById('global-modal');
+    const body = document.getElementById('modal-body');
+    
+    if (!modal || !body) return;
+    
+    body.innerHTML = `
+      <h3 style="text-align:center; margin-bottom:20px;">⭐ قيّم ${revieweeName}</h3>
+      <div style="text-align:center; margin:20px 0;">
+        <div id="rating-input" class="rating-stars" style="font-size:2rem; cursor:pointer;">
+          ☆ ☆ ☆ ☆ ☆
+        </div>
+        <input type="hidden" id="rating-value" value="0">
+      </div>
+      <div class="form-group">
+        <label>تعليقك (يظهر للإدارة فقط):</label>
+        <textarea id="rating-comment" class="input-field" rows="3" placeholder="اكتب رأيك هنا..."></textarea>
+      </div>
+      <button onclick="Rating.submit('${tripId}', '${revieweeId}')" class="btn btn-primary">إرسال التقييم</button>
+    `;
+    
+    // تفعيل اختيار النجوم
+    const starsContainer = body.querySelector('#rating-input');
+    if (starsContainer) {
+      starsContainer.onclick = (e) => {
+        const value = e.target.dataset.value || 1;
+        document.getElementById('rating-value').value = value;
+        starsContainer.innerHTML = Rating.renderStars(value);
+      };
+    }
+    
+    modal.classList.remove('hidden');
+  },
+  
+  // إرسال التقييم
+  submit: async (tripId, revieweeId) => {
+    const rating = parseInt(document.getElementById('rating-value')?.value || '0');
+    const comment = document.getElementById('rating-comment')?.value.trim() || '';
+    
+    if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
+    
+    // ✅ منع التقييم المتكرر (التحقق من trip_id)
+    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
+    
+    const { error } = await App.db.from('reviews').insert({
+      trip_id: tripId,
+      reviewer_id: App.user?.id,
+      reviewee_id: revieweeId,
+      rating,
+      comment: comment || null
+    });
+    
+    if (error) return alert('❌ فشل إرسال التقييم: ' + error.message);
+    
+    // تحديث متوسط التقييم للمستخدم المُقيَّم
+    await Rating.updateAverage(revieweeId);
+    
+    document.getElementById('global-modal')?.classList.add('hidden');
+    alert('✅ شكراً لتقييمك!');
+  },
+  
+  // تحديث متوسط التقييم (يُستدعى بعد كل تقييم جديد)
+  updateAverage: async (userId) => {
+    const { data } = await App.db.from('reviews')
+      .select('rating')
+      .eq('reviewee_id', userId);
+    
+    if (!data || data.length === 0) return;
+    
+    const sum = data.reduce((acc, r) => acc + r.rating, 0);
+    const avg = sum / data.length;
+    
+    await App.db.from('profiles').update({
+      avg_rating: parseFloat(avg.toFixed(2)),
+      rating_count: data.length
+    }).eq('id', userId);
+  }
+};
+
+// ==========================================
+// 💬 Messages Module - جديد
+// ==========================================
+const Messages = {
+  // فتح نافذة المراسلة
+  openChatModal: () => {
+    const modal = document.getElementById('global-modal');
+    const body = document.getElementById('modal-body');
+    
+    if (!modal || !body) return;
+    
+    body.innerHTML = `
+      <h3 style="text-align:center; margin-bottom:15px;">💬 مراسلة الإدارة</h3>
+      <div id="chat-messages" style="max-height:300px; overflow-y:auto; margin-bottom:15px; padding:10px; background:#f8fafc; border-radius:12px;"></div>
+      <div style="display:flex; gap:10px;">
+        <input type="text" id="chat-input" class="input-field" placeholder="اكتب رسالتك..." style="flex:1;">
+        <button onclick="Messages.send()" class="btn btn-primary" style="width:auto; padding:12px 20px;">إرسال</button>
+      </div>
+      <p style="font-size:11px; color:var(--text-muted); margin-top:10px; text-align:center;">
+        ⏳ تُحفظ الرسائل لمدة 24 ساعة فقط
+      </p>
+    `;
+    
+    modal.classList.remove('hidden');
+    Messages.fetch();
+  },
+  
+  // جلب الرسائل (آخر 24 ساعة فقط)
+  fetch: async () => {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">جاري التحميل...</div>';
+    
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    
+    const { data } = await App.db.from('messages')
+      .select('*')
+      .or(`sender_id.eq.${App.user?.id},receiver_id.eq.${App.user?.id}`)
+      .gte('created_at', twentyFourHoursAgo)
+      .order('created_at', { ascending: true });
+    
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">لا توجد رسائل</div>';
+      return;
+    }
+    
+    container.innerHTML = data.map(msg => {
+      const isSent = msg.sender_id === App.user?.id;
+      const time = new Date(msg.created_at).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="message-bubble ${isSent ? 'msg-sent' : 'msg-received'} ${!msg.is_read && !isSent ? 'msg-unread' : ''}">
+          ${msg.content}
+          <span class="msg-status">${time} ${!msg.is_read && !isSent ? '• 🟡 جديد' : ''}</span>
+        </div>
+      `;
+    }).join('');
+    
+    // التمرير للأسفل
+    container.scrollTop = container.scrollHeight;
+    
+    // ✅ تحديث حالة المقروءة للرسائل الواردة
+    const unreadIds = data.filter(m => !m.is_read && m.receiver_id === App.user?.id).map(m => m.id);
+    if (unreadIds.length > 0) {
+      await App.db.from('messages').update({ is_read: true }).in('id', unreadIds);
+    }
+  },
+  
+  // إرسال رسالة
+  send: async () => {
+    const input = document.getElementById('chat-input');
+    const content = input?.value.trim();
+    if (!content) return;
+    
+    // إرسال للإدارة (استبدل بـ ID الإدارة الفعلي)
+    const { error } = await App.db.from('messages').insert({
+      sender_id: App.user?.id,
+      receiver_id: CONFIG.ADMIN_USER_ID || App.user?.id,
+      content,
+      is_read: false
+    });
+    
+    if (error) return alert('❌ فشل الإرسال: ' + error.message);
+    
+    input.value = '';
+    Messages.fetch();
+  }
+};
+
+// ==========================================
+// ℹ️ AboutShira Module - جديد
+// ==========================================
+const AboutShira = {
+  showModal: () => {
+    const modal = document.getElementById('global-modal');
+    const body = document.getElementById('modal-body');
+    
+    if (!modal || !body) return;
+    
+    body.innerHTML = `
+      <div style="text-align:center;">
+        <div style="font-size:3rem; margin-bottom:10px;">🚀</div>
+        <h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
+        <p style="color:var(--text-muted); margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
+        
+        <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:20px; text-align:right;">
+          <p><strong>📱 الإصدار:</strong> 3.0.0</p>
+          <p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
+          <p><strong>📍 المقر:</strong> بغداد، العراق</p>
+          <p><strong>📧 الدعم:</strong> support@shira.app</p>
+        </div>
+        
+        <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="margin-bottom:10px;">
+          <i class="fab fa-whatsapp"></i> تواصل عبر واتساب
+        </button>
+        <button onclick="Messages.openChatModal()" class="btn btn-secondary">
+          <i class="fas fa-comment"></i> مراسلة داخل التطبيق
+        </button>
+      </div>
+    `;
+    
+    modal.classList.remove('hidden');
+  }
+};
+
+// ==========================================
+// 🛠️ Utils Module - إضافات جديدة
+// ==========================================
+const Utils = {
+  compressImage: async (file, maxWidth, quality) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = (maxWidth / width) * height;
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+        };
+      };
+    });
+  },
+  
+  openWhatsApp: () => {
+    // ✅ فتح واتساب مع الرقم المحدد
+    window.open('https://wa.me/9647722507019', '_blank');
+  },
+  
+  openInAppChat: () => {
+    Messages.openChatModal();
+  },
+  
+  // ✅ دوال الهيكل العظمي (Skeleton Loading)
+  showSkeleton: (selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="skeleton" style="height:20px; width:80%; margin:10px auto;"></div>
+      <div class="skeleton" style="height:20px; width:60%; margin:10px auto;"></div>
+      <div class="skeleton" style="height:100px; width:100%; margin:10px auto; border-radius:12px;"></div>
+      <div class="skeleton" style="height:20px; width:90%; margin:10px auto;"></div>
+    `;
+  },
+  
+  hideSkeleton: (selector) => {
+    // يتم استدعاؤها تلقائياً بعد تحميل المحتوى الفعلي
+    // لا حاجة لإخفاء يدوي هنا لأن المحتوى الجديد سيحل محل الهيكل
+  }
+};
+
+// ==========================================
+// 🚀 التهيئة النهائية
+// ==========================================
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => App.init());
 } else {
