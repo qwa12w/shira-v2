@@ -1,12 +1,12 @@
 // ==========================================
-// شراع | Shira Platform - Admin Module v2.3
-// ✅ التحديث: إصلاح تحقق المالك، العدادات، قيد المراجعة، المدراء، تفاصيل المستخدم
+// شراع | Shira Platform - Admin Module v2.4
+// ✅ التحديث: دعم دور المالك (owner) بشكل رسمي، العدادات، قيد المراجعة، المدراء، تفاصيل المستخدم
 // ⚠️ ملاحظة: كلمة المرور تُدار عبر Supabase Authentication وليست في هذا الملف
 // ==========================================
 
 const Admin = {
   db: null,
-  ownerEmail: "aliiraqi22507019@gmail.com", // ✅ بريد المالك الرئيسي
+  ownerEmail: "aliiraqi22507019@gmail.com", // ✅ بريد المالك الرئيسي (للتوافق فقط)
   currentAdmin: null,
   map: null,
   userMarkers: {},
@@ -44,9 +44,8 @@ const Admin = {
         const profRes = await Admin.db.from('profiles').select('*').eq('id', session.user.id).single();
         const profile = profRes.data;
         
-        // ✅ استخدام إيميل الجلسة الموثّق من Supabase (أدق من ملف البروفايل)
-        const sessionEmail = session.user.email?.toLowerCase() || '';
-        const isOwner = sessionEmail === Admin.ownerEmail.toLowerCase();
+        // ✅ التحقق من دور المالك (owner) أو المدير (admin) بناءً على الدور في قاعدة البيانات
+        const isOwner = profile?.role === 'owner';
         
         if (profile && (isOwner || profile.role === 'admin')) {
           Admin.currentAdmin = profile;
@@ -78,7 +77,7 @@ const Admin = {
     try {
       Admin.ensureDb();
       const [all, customers, drivers, delivery, stores, pending] = await Promise.all([
-        Admin.db.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'admin'),
+        Admin.db.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'admin').neq('role', 'owner'),
         Admin.db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'زبون'),
         Admin.db.from('profiles').select('id', { count: 'exact', head: true }).in('role', ['سائق تكسي', 'سائق توك توك']),
         Admin.db.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'دلفري'),
@@ -188,7 +187,7 @@ const Admin = {
     try {
       Admin.ensureDb();
       const [users, active, pending, trips, stores] = await Promise.all([
-        Admin.db.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'admin'),
+        Admin.db.from('profiles').select('id', { count: 'exact', head: true }).neq('role', 'admin').neq('role', 'owner'),
         Admin.db.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'نشط'),
         Admin.db.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'قيد المراجعة'),
         Admin.db.from('trips').select('id', { count: 'exact', head: true }),
@@ -252,7 +251,7 @@ const Admin = {
   loadUsers: async (container, type) => {
     try {
       Admin.ensureDb();
-      let query = Admin.db.from('profiles').select('*').neq('role', 'admin');
+      let query = Admin.db.from('profiles').select('*').neq('role', 'admin').neq('role', 'owner');
       
       if (type === 'customer') query = query.eq('role', 'زبون');
       else if (type === 'driver') query = query.in('role', ['سائق تكسي', 'سائق توك توك']);
@@ -517,7 +516,8 @@ const Admin = {
 
   // ✅ قسم المدراء (للمالك فقط)
   loadManagers: async (container) => {
-    if (!Admin.permissions.canManageManagers) {
+    // ✅ التحقق من دور المالك مباشرة
+    if (Admin.currentAdmin?.role !== 'owner') {
       return container.innerHTML = '<div class="text-center mt-2" style="color:var(--red)">⛔ صلاحية المالك فقط</div>';
     }
     
@@ -560,7 +560,7 @@ const Admin = {
     const { data } = await Admin.db.from('profiles')
       .select('id, name, phone, email, role, admin_permissions, work_hours')
       .eq('role', 'admin')
-      .neq('email', Admin.ownerEmail);
+      .neq('role', 'owner'); // ✅ استبعاد المالك من قائمة المدراء
     
     const list = document.getElementById('managers-list');
     if (!list) return;
