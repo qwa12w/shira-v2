@@ -1,6 +1,6 @@
 // ==========================================
 // شراع | Shira Platform - Core Application Engine
-// ✅ النسخة الكاملة مع تحديثات التسجيل
+// ✅ النسخة النهائية: كل الأدوار تبقى في التطبيق الرئيسي
 // ==========================================
 
 const App = {
@@ -60,11 +60,8 @@ const App = {
       
       if (!profile) return App.hardLogout();
 
-      // ✅ إضافة جديدة: توجيه المدير إلى لوحة الإدارة فوراً
-      if (profile.role === 'admin') {
-        window.location.href = '/admin.html';
-        return;
-      }
+      // ✅ تم إزالة توجيه المدير إلى admin.html
+      // الآن جميع المستخدمين (بما فيهم المدير) يبقون في التطبيق الرئيسي
 
       if (profile.pending_deletion_at) {
         const delDate = new Date(profile.pending_deletion_at);
@@ -297,7 +294,6 @@ const Views = {
 
     const roleFields = {
       'زبون': '',
-
       'سائق تكسي': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
         <h4 style="margin-bottom: 15px; color: var(--p);">🚗 بيانات السيارة</h4>
@@ -319,7 +315,6 @@ const Views = {
           <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
-
       'سائق توك توك': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
         <h4 style="margin-bottom: 15px; color: var(--p);">🛺 بيانات التوك توك</h4>
@@ -341,7 +336,6 @@ const Views = {
           <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
-
       'صاحب متجر': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
         <h4 style="margin-bottom: 15px; color: var(--p);">🏪 بيانات المتجر</h4>
@@ -372,7 +366,6 @@ const Views = {
           <small style="color: var(--g); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
         </div>
       `,
-
       'دلفري': `
         <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
         <h4 style="margin-bottom: 15px; color: var(--p);">🏍️ بيانات الدراجة</h4>
@@ -538,10 +531,10 @@ const Auth = {
       }
     }
 
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: { data: { name, phone, role, gender, age: parseInt(age) } }
+      options: {  { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -565,7 +558,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -598,7 +591,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
           
@@ -632,7 +625,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
