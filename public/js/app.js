@@ -1,7 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v3.0
-// ✅ التحديث: التقييم، الرسائل، الهيكل العظمي، عن شراع، تواصل معنا، تحسينات الواجهة
-// ⚠️ ملاحظة: تم دمج دوال Utils في هذا الملف لتجنب التعارض مع utils.js
+// شراع | Shira Platform - Core Application Engine v3.1
+// ✅ التصحيح النهائي: إصلاح SyntaxError في signUp options ودمج Utils
 // ==========================================
 
 const App = {
@@ -271,7 +270,7 @@ const App = {
 };
 
 // ==========================================
-// 🎨 Views Module - مع تحسينات الواجهة الجديدة
+// 🎨 Views Module
 // ==========================================
 const Views = {
   roleSelect: () => {
@@ -495,7 +494,6 @@ const Views = {
     
     const fallbackSvg = 'image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1OWUwYiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkqQ8L3RleHQ+PC9zdmc+';
     
-    // ✅ قسم التواصل والدعم (جديد)
     const supportSection = `
       <div class="card glass-panel" style="margin-top:20px;">
         <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:8px;">
@@ -515,7 +513,6 @@ const Views = {
       </div>
     `;
     
-    // ✅ قسم التقييم (للسائقين والمتاجر والدلفري فقط)
     const ratingSection = (role !== 'زبون' && role !== 'admin' && role !== 'owner') ? `
       <div class="card glass-panel" style="text-align:center;">
         <h4 style="margin-bottom:10px;">⭐ تقييمك العام</h4>
@@ -542,7 +539,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module
+// 🔐 Auth Module (✅ تم تصحيح الخطأ هنا)
 // ==========================================
 const Auth = {
   login: async () => {
@@ -593,7 +590,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr,  upData } = await App.db.storage
+        const { error: upErr, data: upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         
@@ -607,10 +604,11 @@ const Auth = {
       }
     }
 
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ التصحيح: إضافة المفتاح 'data' في الخيارات
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {  { name, phone, role, gender, age: parseInt(age) } }
+      options: { data: { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -634,7 +632,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -667,7 +665,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
           
@@ -701,7 +699,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           
@@ -865,10 +863,9 @@ const Profile = {
 };
 
 // ==========================================
-// ⭐ Rating Module - جديد
+// ⭐ Rating Module
 // ==========================================
 const Rating = {
-  // عرض النجوم بصرياً
   renderStars: (avgRating) => {
     const fullStars = Math.floor(avgRating);
     const hasHalf = avgRating % 1 >= 0.5;
@@ -881,7 +878,6 @@ const Rating = {
     return html;
   },
   
-  // عرض نموذج التقييم
   showRatingModal: (tripId, revieweeId, revieweeName, onComplete) => {
     const modal = document.getElementById('global-modal');
     const body = document.getElementById('modal-body');
@@ -903,7 +899,6 @@ const Rating = {
       <button onclick="Rating.submit('${tripId}', '${revieweeId}')" class="btn btn-primary">إرسال التقييم</button>
     `;
     
-    // تفعيل اختيار النجوم
     const starsContainer = body.querySelector('#rating-input');
     if (starsContainer) {
       starsContainer.onclick = (e) => {
@@ -916,15 +911,13 @@ const Rating = {
     modal.classList.remove('hidden');
   },
   
-  // إرسال التقييم
   submit: async (tripId, revieweeId) => {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
     
-    // ✅ منع التقييم المتكرر (التحقق من trip_id)
-    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     
     const { error } = await App.db.from('reviews').insert({
@@ -937,14 +930,12 @@ const Rating = {
     
     if (error) return alert('❌ فشل إرسال التقييم: ' + error.message);
     
-    // تحديث متوسط التقييم للمستخدم المُقيَّم
     await Rating.updateAverage(revieweeId);
     
     document.getElementById('global-modal')?.classList.add('hidden');
     alert('✅ شكراً لتقييمك!');
   },
   
-  // تحديث متوسط التقييم (يُستدعى بعد كل تقييم جديد)
   updateAverage: async (userId) => {
     const { data } = await App.db.from('reviews')
       .select('rating')
@@ -963,10 +954,9 @@ const Rating = {
 };
 
 // ==========================================
-// 💬 Messages Module - جديد
+// 💬 Messages Module
 // ==========================================
 const Messages = {
-  // فتح نافذة المراسلة
   openChatModal: () => {
     const modal = document.getElementById('global-modal');
     const body = document.getElementById('modal-body');
@@ -989,7 +979,6 @@ const Messages = {
     Messages.fetch();
   },
   
-  // جلب الرسائل (آخر 24 ساعة فقط)
   fetch: async () => {
     const container = document.getElementById('chat-messages');
     if (!container) return;
@@ -1020,23 +1009,19 @@ const Messages = {
       `;
     }).join('');
     
-    // التمرير للأسفل
     container.scrollTop = container.scrollHeight;
     
-    // ✅ تحديث حالة المقروءة للرسائل الواردة
     const unreadIds = data.filter(m => !m.is_read && m.receiver_id === App.user?.id).map(m => m.id);
     if (unreadIds.length > 0) {
       await App.db.from('messages').update({ is_read: true }).in('id', unreadIds);
     }
   },
   
-  // إرسال رسالة
   send: async () => {
     const input = document.getElementById('chat-input');
     const content = input?.value.trim();
     if (!content) return;
     
-    // إرسال للإدارة (استبدل بـ ID الإدارة الفعلي)
     const { error } = await App.db.from('messages').insert({
       sender_id: App.user?.id,
       receiver_id: CONFIG.ADMIN_USER_ID || App.user?.id,
@@ -1052,7 +1037,7 @@ const Messages = {
 };
 
 // ==========================================
-// ℹ️ AboutShira Module - جديد
+// ℹ️ AboutShira Module
 // ==========================================
 const AboutShira = {
   showModal: () => {
@@ -1088,7 +1073,7 @@ const AboutShira = {
 };
 
 // ==========================================
-// 🛠️ Utils Module - موحد (إضافة ضرورية لحل التعارض)
+// 🛠️ Utils Module (موحد ومدمج في app.js)
 // ==========================================
 const Utils = {
   compressImage: async (file, maxWidth, quality) => {
