@@ -57,7 +57,7 @@
   <div id="app-container" class="screen hidden">
     
     <!-- الهيدر العلوي -->
-    <header id="app-header" class="glass-panel" style="border-radius:0; border-left:0; border-right:0; margin:0; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100;">
+    <header id="app-header" class="glass-panel" style="border-radius:0; border-left:0; border-right:0; margin:0; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; background: white;">
       <button id="back-btn" class="icon-btn hidden" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">↩️</button>
       <h1 id="header-title" style="margin:0; font-size:1.1rem; font-weight:700;">شراع</h1>
       <div class="header-actions" style="display:flex; gap:12px;">
@@ -70,29 +70,14 @@
     </header>
 
     <!-- منطقة عرض المحتوى المتغير (Router View) -->
-    <main id="app-view" style="padding:16px; min-height:calc(100vh - 140px);">
+    <!-- ✅ تم تعديل min-height ليكون مرناً بعد إزالة الشريط الثابت -->
+    <main id="app-view" style="padding:16px; min-height:calc(100vh - 70px);">
       <!-- هنا يتم حقن الصفحات ديناميكياً -->
     </main>
 
-    <!-- شريط التنقل السفلي -->
-    <nav id="bottom-nav" class="hidden glass-panel" style="border-radius:0; border-left:0; border-right:0; margin:0; padding:8px; display:flex; justify-content:space-around; position:fixed; bottom:0; left:0; right:0; z-index:100;">
-      <button data-route="home" class="nav-item active" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
-        <span style="font-size:1.3rem;">🏠</span>
-        <span>الرئيسية</span>
-      </button>
-      <button data-route="orders" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
-        <span style="font-size:1.3rem;">📦</span>
-        <span>طلباتي</span>
-      </button>
-      <button data-route="chat" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
-        <span style="font-size:1.3rem;">💬</span>
-        <span>الرسائل</span>
-      </button>
-      <button data-route="profile" class="nav-item" style="flex:1; text-align:center; padding:8px; background:none; border:none; cursor:pointer; font-size:0.8rem; display:flex; flex-direction:column; align-items:center; gap:4px;">
-        <span style="font-size:1.3rem;">👤</span>
-        <span>الملف</span>
-      </button>
-    </nav>
+    <!-- ✅ تم حذف شريط التنقل السفلي الثابت من هنا -->
+    <!-- سيظهر الشريط الآن فقط داخل صفحة الملف الشخصي عبر app.js -->
+
   </div>
 
   <!-- نافذة منبثقة عامة (Modal) -->
@@ -115,7 +100,7 @@
   
   <!-- 3. ملفات المشروع -->
   <script src="js/config.js"></script>
-  <!-- <script src="js/utils.js"></script> -->  <!-- ✅ تم التعليق: الدوال مدمجة في app.js -->
+  <!-- <script src="js/utils.js"></script> -->
   <script src="js/app.js"></script>
 
 </body>
