@@ -1,6 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v3.3
-// ✅ التحديث النهائي: استبدال جميع نوافذ المتصفح بالنافذة الأنيقة
+// شراع | Shira Platform - Core Application Engine v3.4
+// ✅ التحديث النهائي: نقل شريط التنقل إلى الملف الشخصي فقط + إصلاحات الواجهة
 // ==========================================
 
 const App = {
@@ -141,7 +141,7 @@ const App = {
   secureLogout: async () => {
     if (!App.profile || !App.profile.phone) return alert('❌ بيانات غير مكتملة');
     
-    // ✅ استخدام النافذة الأنيقة لـ confirm
+    // ✅ استخدام النافذة الأنيقة للتأكيد
     const confirmed = await new Promise((resolve) => {
       showCustomAlert(
         '⚠️ تحذير هام',
@@ -183,15 +183,17 @@ const App = {
 
   router: (route, payload) => {
     const container = document.getElementById('app-view');
-    const nav = document.getElementById('bottom-nav');
     const headerTitle = document.getElementById('header-title');
     const backBtn = document.getElementById('back-btn');
     const gate = document.getElementById('gate-status');
     const appContainer = document.getElementById('app-container');
+    
     if (gate) gate.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
+    
     const isAuth = ['login', 'register', 'role-select'].includes(route);
-    if (nav) nav.classList.toggle('hidden', isAuth);
+    
+    // ✅ إخفاء زر الرجوع في الصفحات الرئيسية
     if (backBtn) {
       backBtn.classList.toggle('hidden', ['home', 'dashboard', 'login'].includes(route));
       backBtn.onclick = () => {
@@ -199,7 +201,9 @@ const App = {
         App.router(role === 'زبون' ? 'home' : 'dashboard');
       };
     }
+    
     Utils.showSkeleton('#app-view');
+    
     if (App.routes[route]) {
       container.innerHTML = App.routes[route](payload);
       Utils.hideSkeleton('#app-view');
@@ -217,18 +221,13 @@ const App = {
       }
       Utils.hideSkeleton('#app-view');
     }
+    
     App.currentRoute = route;
-    App.updateNavActive(route);
+    
+    // ✅ إعادة تهيئة الخريطة إذا لزم الأمر
     if (route === 'request-ride') {
       setTimeout(() => MapUtils.init(payload), 100);
     }
-  },
-
-  updateNavActive: (route) => {
-    const items = document.querySelectorAll('.nav-item');
-    items.forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.route === route);
-    });
   },
 
   setupListeners: () => {
@@ -241,13 +240,9 @@ const App = {
     }
     const profileBtn = document.getElementById('profile-btn');
     if (profileBtn) profileBtn.addEventListener('click', () => App.router('profile'));
-    const bottomNav = document.getElementById('bottom-nav');
-    if (bottomNav) {
-      bottomNav.addEventListener('click', (e) => {
-        const target = e.target.closest('.nav-item');
-        if (target && target.dataset.route) App.router(target.dataset.route);
-      });
-    }
+    
+    // ✅ تم إزالة مستمع الشريط السفلي العالمي لأنه أصبح داخل الملف الشخصي
+    
     const modalClose = document.querySelector('.modal-close');
     if (modalClose) {
       modalClose.onclick = () => document.getElementById('global-modal')?.classList.add('hidden');
@@ -472,14 +467,17 @@ const Views = {
       setTimeout(() => App.router('login'), 100);
       return '<div class="text-center mt-2">جاري التحميل...</div>';
     }
+    
     const name = App.profile.name || 'مستخدم';
     const phone = App.profile.phone || '';
     const role = App.profile.role || '';
     const profileImage = App.profile.profile_image;
     const avgRating = App.profile.avg_rating || 0;
     const ratingCount = App.profile.rating_count || 0;
+    
     const avatarUrl = profileImage ? profileImage : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=f59e0b&color=fff&size=200';
     const fallbackSvg = 'image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1OWUwYiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkqQ8L3RleHQ+PC9zdmc+';
+    
     const supportSection = `
       <div class="card glass-panel" style="margin-top:20px;">
         <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:8px;">
@@ -498,6 +496,7 @@ const Views = {
         </button>
       </div>
     `;
+    
     const ratingSection = (role !== 'زبون' && role !== 'admin' && role !== 'owner') ? `
       <div class="card glass-panel" style="text-align:center;">
         <h4 style="margin-bottom:10px;">⭐ تقييمك العام</h4>
@@ -509,16 +508,75 @@ const Views = {
         </p>
       </div>
     ` : '';
-    return `<div class="text-center mb-2">
-      <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
-      <h2 class="mt-2">${name}</h2>
-      <p style="color:var(--text-muted);">${phone}</p>
-      <p style="color: var(--primary); font-size: 14px; margin-top: 5px; font-weight:600;">${role}</p>
-    </div>
-    ${ratingSection}
-    <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
-    <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
-    ${supportSection}`;
+    
+    // ✅ شريط التنقل يظهر هنا فقط (داخل الملف الشخصي)
+    const bottomNavInProfile = `
+      <div class="profile-bottom-nav" style="
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: linear-gradient(to bottom, rgba(255,255,255,0.98), rgba(255,255,255,0.95));
+        backdrop-filter: blur(10px);
+        padding: 10px 5px;
+        display: flex; justify-content: space-around; align-items: center;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 999; border-top: 1px solid #f1f5f9;
+      ">
+        <button onclick="App.router('home')" style="
+          flex: 1; text-align: center; padding: 8px 5px;
+          background: none; border: none; cursor: pointer;
+          font-size: 0.75rem; display: flex;
+          flex-direction: column; align-items: center; gap: 4px;
+          color: #64748b; transition: all 0.2s;
+        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
+          <span style="font-size: 1.3rem;">🏠</span>
+          <span>الرئيسية</span>
+        </button>
+        <button onclick="App.router('orders')" style="
+          flex: 1; text-align: center; padding: 8px 5px;
+          background: none; border: none; cursor: pointer;
+          font-size: 0.75rem; display: flex;
+          flex-direction: column; align-items: center; gap: 4px;
+          color: #64748b; transition: all 0.2s;
+        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
+          <span style="font-size: 1.3rem;">📦</span>
+          <span>طلباتي</span>
+        </button>
+        <button onclick="App.router('chat')" style="
+          flex: 1; text-align: center; padding: 8px 5px;
+          background: none; border: none; cursor: pointer;
+          font-size: 0.75rem; display: flex;
+          flex-direction: column; align-items: center; gap: 4px;
+          color: #64748b; transition: all 0.2s;
+        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
+          <span style="font-size: 1.3rem;">💬</span>
+          <span>الرسائل</span>
+        </button>
+        <button onclick="App.router('profile')" style="
+          flex: 1; text-align: center; padding: 8px 5px;
+          background: rgba(245, 158, 11, 0.1);
+          border: none; cursor: pointer;
+          font-size: 0.75rem; display: flex;
+          flex-direction: column; align-items: center; gap: 4px;
+          color: #f59e0b; border-radius: 12px;
+        ">
+          <span style="font-size: 1.3rem;">👤</span>
+          <span>الملف</span>
+        </button>
+      </div>
+    `;
+    
+    return `
+      <div class="text-center mb-2" style="padding-top: 20px;">
+        <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
+        <h2 class="mt-2">${name}</h2>
+        <p style="color:var(--text-muted);">${phone}</p>
+        <p style="color: var(--primary); font-size: 14px; margin-top: 5px; font-weight:600;">${role}</p>
+      </div>
+      ${ratingSection}
+      <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
+      <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
+      ${supportSection}
+      ${bottomNavInProfile}
+    `;
   }
 };
 
@@ -1022,7 +1080,7 @@ const Utils = {
 };
 
 // ==========================================
-// 🎨 دالة النافذة المنبثقة الأنيقة (محدثة)
+// 🎨 دالة النافذة المنبثقة الأنيقة
 // ==========================================
 const showCustomAlert = (title, message, onConfirm, onCancel) => {
   const hasCancel = typeof onCancel === 'function';
@@ -1081,15 +1139,12 @@ const showCustomAlert = (title, message, onConfirm, onCancel) => {
 };
 
 // ==========================================
-// 🎨 استبدال جميع نوافذ المتصفح الافتراضية (الحل الجذري)
+// 🎨 استبدال نوافذ المتصفح الافتراضية
 // ==========================================
-
-// ✅ تجاوز alert() الافتراضي
 window.alert = (message) => {
   showCustomAlert('تنبيه', message, null);
 };
 
-// ✅ تجاوز confirm() الافتراضي (يدعم نعم/لا)
 window.confirm = (message) => {
   return new Promise((resolve) => {
     showCustomAlert('تأكيد', message, () => resolve(true), () => resolve(false));
