@@ -1,6 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v3.1
-// ✅ التصحيح النهائي: إصلاح SyntaxError في signUp options ودمج Utils
+// شراع | Shira Platform - Core Application Engine v3.2
+// ✅ التحديث: نافذة منبثقة أنيقة بدلاً من alert الافتراضي
 // ==========================================
 
 const App = {
@@ -18,15 +18,11 @@ const App = {
 
   init: async () => {
     try {
-      // ✅ عرض الهيكل العظمي أثناء التحميل الأولي
       Utils.showSkeleton('#app-view');
-      
       App.db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
       App.setupListeners();
       try { await App.checkGPS(); } catch (e) { console.warn("⚠️ GPS غير متاح."); }
       await App.checkSession();
-      
-      // ✅ إخفاء الهيكل العظمي بعد اكتمال التحميل
       Utils.hideSkeleton('#app-view');
     } catch (err) {
       console.error("❌ Init Error:", err);
@@ -144,28 +140,21 @@ const App = {
 
   secureLogout: async () => {
     if (!App.profile || !App.profile.phone) return alert('❌ بيانات غير مكتملة');
-    
     const confirmed = confirm('⚠️ تحذير هام:\nسيتم تسجيل خروجك، وسيُحذف حسابك نهائياً بعد 5 أيام.\nلن تتمكن من الدخول بنفس الرقم إلا بعد التسجيل الجديد.\nهل تريد المتابعة؟');
     if (!confirmed) return;
-
     const password = prompt('🔐 أدخل كلمة المرور لتأكيد العملية:');
     if (!password) return alert('❌ تم إلغاء العملية.');
-
     const loginRes = await App.db.auth.signInWithPassword({
       email: App.profile.phone + '@shira.app',
       password: password
     });
-    
     if (loginRes.error) return alert('❌ كلمة المرور غير صحيحة.');
-
     const delDate = new Date();
     delDate.setDate(delDate.getDate() + 5);
-    
     await App.db.from('profiles').update({
       pending_deletion_at: delDate.toISOString(),
       status: 'محذوف مؤقتاً'
     }).eq('id', App.user.id);
-
     alert('✅ تم تسجيل الخروج بنجاح. سيتم حذف الحساب بعد 5 أيام.');
     await App.hardLogout();
   },
@@ -175,12 +164,10 @@ const App = {
     const nav = document.getElementById('bottom-nav');
     const headerTitle = document.getElementById('header-title');
     const backBtn = document.getElementById('back-btn');
-
     const gate = document.getElementById('gate-status');
     const appContainer = document.getElementById('app-container');
     if (gate) gate.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
-
     const isAuth = ['login', 'register', 'role-select'].includes(route);
     if (nav) nav.classList.toggle('hidden', isAuth);
     if (backBtn) {
@@ -190,10 +177,7 @@ const App = {
         App.router(role === 'زبون' ? 'home' : 'dashboard');
       };
     }
-
-    // ✅ عرض الهيكل العظمي أثناء تغيير الصفحة
     Utils.showSkeleton('#app-view');
-    
     if (App.routes[route]) {
       container.innerHTML = App.routes[route](payload);
       Utils.hideSkeleton('#app-view');
@@ -235,7 +219,6 @@ const App = {
     }
     const profileBtn = document.getElementById('profile-btn');
     if (profileBtn) profileBtn.addEventListener('click', () => App.router('profile'));
-    
     const bottomNav = document.getElementById('bottom-nav');
     if (bottomNav) {
       bottomNav.addEventListener('click', (e) => {
@@ -243,8 +226,6 @@ const App = {
         if (target && target.dataset.route) App.router(target.dataset.route);
       });
     }
-    
-    // ✅ مستمع للنوافذ المنبثقة
     const modalClose = document.querySelector('.modal-close');
     if (modalClose) {
       modalClose.onclick = () => document.getElementById('global-modal')?.classList.add('hidden');
@@ -254,7 +235,6 @@ const App = {
   startLiveTracking: () => {
     if (!App.user || !App.user.id) return;
     if (App.gpsWatchId) navigator.geolocation.clearWatch(App.gpsWatchId);
-    
     App.gpsWatchId = navigator.geolocation.watchPosition(async (pos) => {
       try {
         await App.db.from('profiles').update({
@@ -281,7 +261,6 @@ const Views = {
       `<div class="card" onclick="App.router('register', 'دلفري')"><div class="icon">🏍️</div><h3>دلفري</h3></div>` +
       `<button onclick="App.router('login')" class="btn btn-outline mt-2">لديك حساب؟ سجل دخول</button>`;
   },
-  
   login: () => {
     return `<div class="card glass-panel">
       <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="login-phone" class="input-field" placeholder="07..."></div>
@@ -290,7 +269,6 @@ const Views = {
       <button onclick="App.router('role-select')" class="btn btn-outline mt-2">إنشاء حساب جديد</button>
     </div>`;
   },
-  
   register: (role) => {
     const commonFields = `
       <div class="form-group">
@@ -326,7 +304,6 @@ const Views = {
         <input type="password" id="reg-pass-confirm" class="input-field" minlength="6" required>
       </div>
     `;
-
     const roleFields = {
       'زبون': '',
       'سائق تكسي': `
@@ -427,9 +404,7 @@ const Views = {
         </div>
       `
     };
-
     const extraFields = roleFields[role] || '';
-    
     return `
       <form id="reg-form" style="text-align: right;">
         ${commonFields}
@@ -439,13 +414,11 @@ const Views = {
       <button onclick="App.router('login')" class="btn btn-outline">⬅️ رجوع لتسجيل الدخول</button>
     `;
   },
-  
   home: () => {
     return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
       `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
       `<div class="card" onclick="App.router('shopping')"><div class="icon">🛒</div><h3>تسوق</h3></div>`;
   },
-  
   shopping: () => {
     return `<div class="text-center" style="padding: 40px 20px;">
       <div style="font-size: 60px; margin-bottom: 20px;">🛒</div>
@@ -453,7 +426,6 @@ const Views = {
       <p style="color: var(--text-muted); margin-bottom: 30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
       <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
   },
-  
   dashboard: () => {
     if (!App.profile) {
       setTimeout(() => App.router('login'), 100);
@@ -464,7 +436,6 @@ const Views = {
     return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span></p></div>` +
       `<div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
-  
   requestRide: (type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
     return `<div class="map-wrapper" style="height:300px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>` +
@@ -474,26 +445,19 @@ const Views = {
       `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--primary); font-size:20px;"><span id="price-val">${basePrice}</span> د.ع</strong></div>` +
       `<button onclick="Trips.request('${type}')" class="btn btn-primary">🚀 تأكيد الرحلة</button>`;
   },
-  
   profile: () => {
     if (!App.profile) {
       setTimeout(() => App.router('login'), 100);
       return '<div class="text-center mt-2">جاري التحميل...</div>';
     }
-    
     const name = App.profile.name || 'مستخدم';
     const phone = App.profile.phone || '';
     const role = App.profile.role || '';
     const profileImage = App.profile.profile_image;
     const avgRating = App.profile.avg_rating || 0;
     const ratingCount = App.profile.rating_count || 0;
-    
-    const avatarUrl = profileImage 
-      ? profileImage 
-      : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=f59e0b&color=fff&size=200';
-    
+    const avatarUrl = profileImage ? profileImage : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=f59e0b&color=fff&size=200';
     const fallbackSvg = 'image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1OWUwYiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkqQ8L3RleHQ+PC9zdmc+';
-    
     const supportSection = `
       <div class="card glass-panel" style="margin-top:20px;">
         <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:8px;">
@@ -512,7 +476,6 @@ const Views = {
         </button>
       </div>
     `;
-    
     const ratingSection = (role !== 'زبون' && role !== 'admin' && role !== 'owner') ? `
       <div class="card glass-panel" style="text-align:center;">
         <h4 style="margin-bottom:10px;">⭐ تقييمك العام</h4>
@@ -524,7 +487,6 @@ const Views = {
         </p>
       </div>
     ` : '';
-    
     return `<div class="text-center mb-2">
       <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
       <h2 class="mt-2">${name}</h2>
@@ -539,7 +501,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module (✅ تم تصحيح الخطأ هنا)
+// 🔐 Auth Module
 // ==========================================
 const Auth = {
   login: async () => {
@@ -547,9 +509,7 @@ const Auth = {
     const passInput = document.getElementById('login-pass');
     const phone = phoneInput ? phoneInput.value.trim() : '';
     const pass = passInput ? passInput.value : '';
-    
     if (!phone || !pass) return alert('⚠️ أكمل البيانات');
-    
     try {
       const checkRes = await App.db.from('profiles').select('pending_deletion_at').eq('phone', phone).single();
       if (checkRes.data && checkRes.data.pending_deletion_at) {
@@ -560,12 +520,10 @@ const Auth = {
         }
       }
     } catch (e) { console.warn('Profile check skipped:', e); }
-    
     const res = await App.db.auth.signInWithPassword({ email: phone + '@shira.app', password: pass });
     if (res.error) return alert('❌ ' + res.error.message);
     location.reload();
   },
-  
   register: async (role) => {
     const name = document.getElementById('reg-name')?.value.trim();
     const phone = document.getElementById('reg-phone')?.value.trim();
@@ -573,7 +531,6 @@ const Auth = {
     const passConf = document.getElementById('reg-pass-confirm')?.value;
     const gender = document.getElementById('reg-gender')?.value;
     const age = document.getElementById('reg-age')?.value;
-
     if (!name || !phone || !pass || !gender || !age) {
       return alert('⚠️ يرجى إكمال جميع الحقول المطلوبة (*)');
     }
@@ -583,7 +540,6 @@ const Auth = {
     if (!/^07[0-9]{9}$/.test(phone)) {
       return alert('⚠️ رقم الجوال غير صحيح (يجب أن يبدأ بـ 07 ويتكون من 10 أرقام)');
     }
-
     let photoUrl = null;
     const photoFile = document.getElementById('reg-photo')?.files[0];
     if (photoFile) {
@@ -593,7 +549,6 @@ const Auth = {
         const { error: upErr, data: upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
-        
         if (!upErr && upData?.path) {
           photoUrl = App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.avatars)
@@ -603,30 +558,23 @@ const Auth = {
         console.warn('⚠️ فشل رفع الصورة الشخصية:', e);
       }
     }
-
-    // ✅ التصحيح: إضافة المفتاح 'data' في الخيارات
     const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
       options: { data: { name, phone, role, gender, age: parseInt(age) } }
     });
-    
     if (authErr) return alert('❌ ' + authErr.message);
     if (!authData?.user) return alert('❌ فشل إنشاء الحساب، حاول مرة أخرى');
-
     const userId = authData.user.id;
     let roleData = {};
-    
     if (role === 'سائق تكسي' || role === 'سائق توك توك') {
       const plate = document.getElementById('reg-plate')?.value.trim();
       const carType = document.getElementById('reg-car-type')?.value.trim();
       const carColor = document.getElementById('reg-car-color')?.value.trim();
       const carPhotos = document.getElementById('reg-car-photos')?.files;
-      
       if (!plate || !carType || !carColor || !carPhotos?.length) {
         return alert('⚠️ يرجى إكمال بيانات المركبة ورفع الصور');
       }
-      
       let carPhotoUrls = [];
       for (let i = 0; i < Math.min(carPhotos.length, 5); i++) {
         try {
@@ -635,7 +583,6 @@ const Auth = {
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
-          
           if (!upErr && upData?.path) {
             carPhotoUrls.push(
               App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl
@@ -643,23 +590,18 @@ const Auth = {
           }
         } catch (e) { console.warn('Image upload skipped:', e); }
       }
-      
       roleData = {
         plate_number: plate,
         vehicle_type: carType,
         vehicle_color: carColor,
         vehicle_images: carPhotoUrls
       };
-    }
-    
-    else if (role === 'صاحب متجر') {
+    } else if (role === 'صاحب متجر') {
       const storeType = document.getElementById('reg-store-type')?.value;
       const storePhotos = document.getElementById('reg-store-photos')?.files;
-      
       if (!storeType || !storePhotos?.length) {
         return alert('⚠️ يرجى اختيار نوع المتجر ورفع الصور');
       }
-      
       let storePhotoUrls = [];
       for (let i = 0; i < Math.min(storePhotos.length, 5); i++) {
         try {
@@ -668,7 +610,6 @@ const Auth = {
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
-          
           if (!upErr && upData?.path) {
             storePhotoUrls.push(
               App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl
@@ -676,24 +617,19 @@ const Auth = {
           }
         } catch (e) { console.warn('Store image upload skipped:', e); }
       }
-      
       roleData = {
         store_type: storeType,
         store_images: storePhotoUrls,
         store_status: 'مغلق'
       };
-    }
-    
-    else if (role === 'دلفري') {
+    } else if (role === 'دلفري') {
       const bikeType = document.getElementById('reg-bike-type')?.value.trim();
       const bikePlate = document.getElementById('reg-bike-plate')?.value.trim() || null;
       const bikeStatus = document.getElementById('reg-bike-status')?.value;
       const bikePhotos = document.getElementById('reg-bike-photos')?.files;
-      
       if (!bikeType || !bikeStatus || !bikePhotos?.length) {
         return alert('⚠️ يرجى إكمال بيانات الدراجة ورفع الصور');
       }
-      
       let bikePhotoUrls = [];
       for (let i = 0; i < Math.min(bikePhotos.length, 5); i++) {
         try {
@@ -702,7 +638,6 @@ const Auth = {
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
-          
           if (!upErr && upData?.path) {
             bikePhotoUrls.push(
               App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl
@@ -710,7 +645,6 @@ const Auth = {
           }
         } catch (e) { console.warn('Bike image upload skipped:', e); }
       }
-      
       roleData = {
         vehicle_type: bikeType,
         plate_number: bikePlate,
@@ -718,7 +652,6 @@ const Auth = {
         vehicle_images: bikePhotoUrls
       };
     }
-
     const profileData = {
       id: userId,
       name,
@@ -730,21 +663,15 @@ const Auth = {
       profile_image: photoUrl,
       ...roleData
     };
-
     const { error: profErr } = await App.db.from('profiles').insert(profileData);
     if (profErr) return alert('❌ خطأ في حفظ البيانات: ' + profErr.message);
 
-    const msg = role === 'زبون' 
-      ? '✅ تم إنشاء حسابك بنجاح! جاري الدخول...' 
-      : '✅ تم تسجيل طلبك! سيراجعه فريق الإدارة خلال 24 ساعة.';
+    // ✅ النافذة الأنيقة بدلاً من alert
+    const title = role === 'زبون' ? '✅ تم إنشاء حسابك!' : '✅ تم تسجيل طلبك!';
+    const message = role === 'زبون' ? 'جاري الدخول...' : 'سيراجعه فريق الإدارة خلال 24 ساعة.';
+    const onConfirm = role === 'زبون' ? () => location.reload() : () => App.router('login');
     
-    alert(msg);
-    
-    if (role === 'زبون') {
-      location.reload();
-    } else {
-      App.router('login');
-    }
+    showCustomAlert(title, message, onConfirm);
   }
 };
 
@@ -756,10 +683,8 @@ const MapUtils = {
     if (App.map) { App.map.remove(); App.map = null; }
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
-
     App.map = L.map('map').setView(App.userLocation || CONFIG.MAP_CENTER, 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(App.map);
-
     if (App.userLocation) {
       App.userMarker = L.marker([App.userLocation.lat, App.userLocation.lng]).addTo(App.map).bindPopup('📍 موقعك الحالي').openPopup();
       App.map.setView([App.userLocation.lat, App.userLocation.lng], 15);
@@ -770,18 +695,14 @@ const MapUtils = {
         App.map.setView([App.userLocation.lat, App.userLocation.lng], 15);
       }, (err) => console.warn('⚠️ تعذر الحصول على الموقع:', err));
     }
-
     App.map.on('click', (e) => {
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
-      
       if (App.destMarker) App.map.removeLayer(App.destMarker);
       App.destMarker = L.marker([lat, lng]).addTo(App.map).bindPopup('🎯 وجهتك').openPopup();
       App.destLocation = { lat: lat, lng: lng };
-      
       const destInput = document.getElementById('ride-dest');
       if (destInput) destInput.value = 'إحداثيات: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
-      
       if (App.userLocation && serviceType) {
         const distance = MapUtils.calculateDistance(App.userLocation.lat, App.userLocation.lng, lat, lng);
         const price = MapUtils.calculatePrice(distance, serviceType);
@@ -790,7 +711,6 @@ const MapUtils = {
       }
     });
   },
-
   calculateDistance: (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -799,7 +719,6 @@ const MapUtils = {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   },
-
   calculatePrice: (distance, type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
     const pricePerKm = (type === 'تاكسي') ? 1000 / 3 : 750 / 3;
@@ -816,11 +735,9 @@ const Trips = {
     const destInput = document.getElementById('ride-dest');
     const dest = destInput ? destInput.value : '';
     if (!dest) return alert('⚠️ يرجى تحديد الوجهة بالضغط على الخريطة');
-    
     const priceEl = document.getElementById('price-val');
     const finalPrice = priceEl ? parseInt(priceEl.innerText) : ((type === 'تاكسي') ? 3000 : 2000);
     if (!App.userLocation) return alert('⚠️ لم يتم تحديد موقعك الحالي.');
-    
     const tripData = {
       customer_id: App.user.id, service_type: type, dropoff_address: dest,
       status: 'قيد الانتظار', pickup_lat: App.userLocation.lat, pickup_lng: App.userLocation.lng, final_price: finalPrice
@@ -829,7 +746,6 @@ const Trips = {
       tripData.dropoff_lat = App.destLocation.lat;
       tripData.dropoff_lng = App.destLocation.lng;
     }
-    
     const res = await App.db.from('trips').insert(tripData);
     if (res.error) return alert('❌ فشل الإرسال: ' + res.error.message);
     alert('🚀 تم إرسال طلب ' + type + ' بنجاح!\nالسعر: ' + finalPrice + ' د.ع');
@@ -877,13 +793,10 @@ const Rating = {
     }
     return html;
   },
-  
   showRatingModal: (tripId, revieweeId, revieweeName, onComplete) => {
     const modal = document.getElementById('global-modal');
     const body = document.getElementById('modal-body');
-    
     if (!modal || !body) return;
-    
     body.innerHTML = `
       <h3 style="text-align:center; margin-bottom:20px;">⭐ قيّم ${revieweeName}</h3>
       <div style="text-align:center; margin:20px 0;">
@@ -898,7 +811,6 @@ const Rating = {
       </div>
       <button onclick="Rating.submit('${tripId}', '${revieweeId}')" class="btn btn-primary">إرسال التقييم</button>
     `;
-    
     const starsContainer = body.querySelector('#rating-input');
     if (starsContainer) {
       starsContainer.onclick = (e) => {
@@ -907,19 +819,14 @@ const Rating = {
         starsContainer.innerHTML = Rating.renderStars(value);
       };
     }
-    
     modal.classList.remove('hidden');
   },
-  
   submit: async (tripId, revieweeId) => {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
-    
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    
     const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
-    
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
       reviewer_id: App.user?.id,
@@ -927,25 +834,18 @@ const Rating = {
       rating,
       comment: comment || null
     });
-    
     if (error) return alert('❌ فشل إرسال التقييم: ' + error.message);
-    
     await Rating.updateAverage(revieweeId);
-    
     document.getElementById('global-modal')?.classList.add('hidden');
     alert('✅ شكراً لتقييمك!');
   },
-  
   updateAverage: async (userId) => {
     const { data } = await App.db.from('reviews')
       .select('rating')
       .eq('reviewee_id', userId);
-    
     if (!data || data.length === 0) return;
-    
     const sum = data.reduce((acc, r) => acc + r.rating, 0);
     const avg = sum / data.length;
-    
     await App.db.from('profiles').update({
       avg_rating: parseFloat(avg.toFixed(2)),
       rating_count: data.length
@@ -960,9 +860,7 @@ const Messages = {
   openChatModal: () => {
     const modal = document.getElementById('global-modal');
     const body = document.getElementById('modal-body');
-    
     if (!modal || !body) return;
-    
     body.innerHTML = `
       <h3 style="text-align:center; margin-bottom:15px;">💬 مراسلة الإدارة</h3>
       <div id="chat-messages" style="max-height:300px; overflow-y:auto; margin-bottom:15px; padding:10px; background:#f8fafc; border-radius:12px;"></div>
@@ -974,30 +872,23 @@ const Messages = {
         ⏳ تُحفظ الرسائل لمدة 24 ساعة فقط
       </p>
     `;
-    
     modal.classList.remove('hidden');
     Messages.fetch();
   },
-  
   fetch: async () => {
     const container = document.getElementById('chat-messages');
     if (!container) return;
-    
     container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">جاري التحميل...</div>';
-    
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    
     const { data } = await App.db.from('messages')
       .select('*')
       .or(`sender_id.eq.${App.user?.id},receiver_id.eq.${App.user?.id}`)
       .gte('created_at', twentyFourHoursAgo)
       .order('created_at', { ascending: true });
-    
     if (!data || data.length === 0) {
       container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">لا توجد رسائل</div>';
       return;
     }
-    
     container.innerHTML = data.map(msg => {
       const isSent = msg.sender_id === App.user?.id;
       const time = new Date(msg.created_at).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
@@ -1008,29 +899,23 @@ const Messages = {
         </div>
       `;
     }).join('');
-    
     container.scrollTop = container.scrollHeight;
-    
     const unreadIds = data.filter(m => !m.is_read && m.receiver_id === App.user?.id).map(m => m.id);
     if (unreadIds.length > 0) {
       await App.db.from('messages').update({ is_read: true }).in('id', unreadIds);
     }
   },
-  
   send: async () => {
     const input = document.getElementById('chat-input');
     const content = input?.value.trim();
     if (!content) return;
-    
     const { error } = await App.db.from('messages').insert({
       sender_id: App.user?.id,
       receiver_id: CONFIG.ADMIN_USER_ID || App.user?.id,
       content,
       is_read: false
     });
-    
     if (error) return alert('❌ فشل الإرسال: ' + error.message);
-    
     input.value = '';
     Messages.fetch();
   }
@@ -1043,22 +928,18 @@ const AboutShira = {
   showModal: () => {
     const modal = document.getElementById('global-modal');
     const body = document.getElementById('modal-body');
-    
     if (!modal || !body) return;
-    
     body.innerHTML = `
       <div style="text-align:center;">
         <div style="font-size:3rem; margin-bottom:10px;">🚀</div>
         <h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
         <p style="color:var(--text-muted); margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
-        
         <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:20px; text-align:right;">
           <p><strong>📱 الإصدار:</strong> 3.0.0</p>
           <p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
           <p><strong>📍 المقر:</strong> بغداد، العراق</p>
           <p><strong>📧 الدعم:</strong> support@shira.app</p>
         </div>
-        
         <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="margin-bottom:10px;">
           <i class="fab fa-whatsapp"></i> تواصل عبر واتساب
         </button>
@@ -1067,13 +948,12 @@ const AboutShira = {
         </button>
       </div>
     `;
-    
     modal.classList.remove('hidden');
   }
 };
 
 // ==========================================
-// 🛠️ Utils Module (موحد ومدمج في app.js)
+// 🛠️ Utils Module
 // ==========================================
 const Utils = {
   compressImage: async (file, maxWidth, quality) => {
@@ -1100,15 +980,12 @@ const Utils = {
       };
     });
   },
-  
   openWhatsApp: () => {
     window.open('https://wa.me/9647722507019', '_blank');
   },
-  
   openInAppChat: () => {
     Messages.openChatModal();
   },
-  
   showSkeleton: (selector) => {
     const el = document.querySelector(selector);
     if (!el) return;
@@ -1119,10 +996,52 @@ const Utils = {
       <div class="skeleton" style="height:20px; width:90%; margin:10px auto;"></div>
     `;
   },
-  
-  hideSkeleton: (selector) => {
-    // يتم استدعاؤها تلقائياً بعد تحميل المحتوى الفعلي
-  }
+  hideSkeleton: (selector) => {}
+};
+
+// ==========================================
+// 🎨 دالة النافذة المنبثقة الأنيقة (جديدة)
+// ==========================================
+const showCustomAlert = (title, message, onConfirm) => {
+  const modal = document.createElement('div');
+  modal.className = 'custom-alert-overlay';
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10000; padding: 20px; animation: fadeIn 0.3s ease;
+  `;
+  modal.innerHTML = `
+    <div style="
+      background: white; border-radius: 20px; padding: 30px 25px;
+      max-width: 400px; width: 100%; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: slideUp 0.4s ease;
+    ">
+      <div style="
+        width: 70px; height: 70px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border-radius: 50%; display: flex; align-items: center;
+        justify-content: center; margin: 0 auto 20px; font-size: 35px;
+      ">✅</div>
+      <h3 style="margin: 0 0 10px; color: #1e293b; font-size: 22px; font-weight: 700;">${title}</h3>
+      <p style="margin: 0 0 25px; color: #64748b; font-size: 15px; line-height: 1.6;">${message}</p>
+      <button onclick="this.closest('.custom-alert-overlay').remove(); ${onConfirm ? 'onConfirm()' : ''}" style="
+        width: 100%; padding: 14px;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white; border: none; border-radius: 12px;
+        font-size: 16px; font-weight: 600; cursor: pointer;
+        transition: transform 0.2s;
+      " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        حسنًا
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  `;
+  document.head.appendChild(style);
 };
 
 // ==========================================
