@@ -1,6 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v3.2
-// ✅ التحديث: نافذة منبثقة أنيقة بدلاً من alert الافتراضي
+// شراع | Shira Platform - Core Application Engine v3.3
+// ✅ التحديث النهائي: استبدال جميع نوافذ المتصفح بالنافذة الأنيقة
 // ==========================================
 
 const App = {
@@ -140,21 +140,43 @@ const App = {
 
   secureLogout: async () => {
     if (!App.profile || !App.profile.phone) return alert('❌ بيانات غير مكتملة');
-    const confirmed = confirm('⚠️ تحذير هام:\nسيتم تسجيل خروجك، وسيُحذف حسابك نهائياً بعد 5 أيام.\nلن تتمكن من الدخول بنفس الرقم إلا بعد التسجيل الجديد.\nهل تريد المتابعة؟');
+    
+    // ✅ استخدام النافذة الأنيقة لـ confirm
+    const confirmed = await new Promise((resolve) => {
+      showCustomAlert(
+        '⚠️ تحذير هام',
+        'سيتم تسجيل خروجك، وسيُحذف حسابك نهائياً بعد 5 أيام.\nلن تتمكن من الدخول بنفس الرقم إلا بعد التسجيل الجديد.\nهل تريد المتابعة؟',
+        () => resolve(true),
+        () => resolve(false)
+      );
+    });
+    
     if (!confirmed) return;
+
     const password = prompt('🔐 أدخل كلمة المرور لتأكيد العملية:');
-    if (!password) return alert('❌ تم إلغاء العملية.');
+    if (!password) {
+      alert('❌ تم إلغاء العملية.');
+      return;
+    }
+
     const loginRes = await App.db.auth.signInWithPassword({
       email: App.profile.phone + '@shira.app',
       password: password
     });
-    if (loginRes.error) return alert('❌ كلمة المرور غير صحيحة.');
+    
+    if (loginRes.error) {
+      alert('❌ كلمة المرور غير صحيحة.');
+      return;
+    }
+
     const delDate = new Date();
     delDate.setDate(delDate.getDate() + 5);
+    
     await App.db.from('profiles').update({
       pending_deletion_at: delDate.toISOString(),
       status: 'محذوف مؤقتاً'
     }).eq('id', App.user.id);
+
     alert('✅ تم تسجيل الخروج بنجاح. سيتم حذف الحساب بعد 5 أيام.');
     await App.hardLogout();
   },
@@ -1000,9 +1022,11 @@ const Utils = {
 };
 
 // ==========================================
-// 🎨 دالة النافذة المنبثقة الأنيقة (جديدة)
+// 🎨 دالة النافذة المنبثقة الأنيقة (محدثة)
 // ==========================================
-const showCustomAlert = (title, message, onConfirm) => {
+const showCustomAlert = (title, message, onConfirm, onCancel) => {
+  const hasCancel = typeof onCancel === 'function';
+  
   const modal = document.createElement('div');
   modal.className = 'custom-alert-overlay';
   modal.style.cssText = `
@@ -1010,6 +1034,7 @@ const showCustomAlert = (title, message, onConfirm) => {
     display: flex; align-items: center; justify-content: center;
     z-index: 10000; padding: 20px; animation: fadeIn 0.3s ease;
   `;
+  
   modal.innerHTML = `
     <div style="
       background: white; border-radius: 20px; padding: 30px 25px;
@@ -1021,27 +1046,54 @@ const showCustomAlert = (title, message, onConfirm) => {
         background: linear-gradient(135deg, #f59e0b, #d97706);
         border-radius: 50%; display: flex; align-items: center;
         justify-content: center; margin: 0 auto 20px; font-size: 35px;
-      ">✅</div>
+      ">${hasCancel ? '⚠️' : '✅'}</div>
       <h3 style="margin: 0 0 10px; color: #1e293b; font-size: 22px; font-weight: 700;">${title}</h3>
-      <p style="margin: 0 0 25px; color: #64748b; font-size: 15px; line-height: 1.6;">${message}</p>
-      <button onclick="this.closest('.custom-alert-overlay').remove(); ${onConfirm ? 'onConfirm()' : ''}" style="
-        width: 100%; padding: 14px;
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        color: white; border: none; border-radius: 12px;
-        font-size: 16px; font-weight: 600; cursor: pointer;
-        transition: transform 0.2s;
-      " onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-        حسنًا
-      </button>
+      <p style="margin: 0 0 25px; color: #64748b; font-size: 15px; line-height: 1.6; white-space: pre-line;">${message}</p>
+      <div style="display: grid; grid-template-columns: ${hasCancel ? '1fr 1fr' : '1fr'}; gap: 10px;">
+        <button onclick="this.closest('.custom-alert-overlay').remove(); ${onConfirm ? 'onConfirm()' : ''}" style="
+          padding: 14px; background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: white; border: none; border-radius: 12px;
+          font-size: 16px; font-weight: 600; cursor: pointer;
+        ">
+          ${hasCancel ? 'حسنًا' : 'إغلاق'}
+        </button>
+        ${hasCancel ? `
+        <button onclick="this.closest('.custom-alert-overlay').remove(); if(typeof onCancel==='function')onCancel()" style="
+          padding: 14px; background: #e2e8f0; color: #475569;
+          border: none; border-radius: 12px;
+          font-size: 16px; font-weight: 600; cursor: pointer;
+        ">
+          إلغاء
+        </button>
+        ` : ''}
+      </div>
     </div>
   `;
+  
   document.body.appendChild(modal);
+  
   const style = document.createElement('style');
   style.textContent = `
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   `;
   document.head.appendChild(style);
+};
+
+// ==========================================
+// 🎨 استبدال جميع نوافذ المتصفح الافتراضية (الحل الجذري)
+// ==========================================
+
+// ✅ تجاوز alert() الافتراضي
+window.alert = (message) => {
+  showCustomAlert('تنبيه', message, null);
+};
+
+// ✅ تجاوز confirm() الافتراضي (يدعم نعم/لا)
+window.confirm = (message) => {
+  return new Promise((resolve) => {
+    showCustomAlert('تأكيد', message, () => resolve(true), () => resolve(false));
+  });
 };
 
 // ==========================================
