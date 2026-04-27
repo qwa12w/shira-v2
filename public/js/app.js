@@ -488,7 +488,6 @@ const Views = {
     
     const role = App.profile.role;
     
-    // ✅ واجهة الزبون فقط
     if (role === 'زبون') {
       return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
         `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
@@ -496,7 +495,6 @@ const Views = {
         `<div class="card" onclick="App.router('my-orders')"><div class="icon">📦</div><h3>طلباتي</h3></div>`;
     }
     
-    // ✅ توجيه الأدوار الأخرى للوحة التحكم
     return Views.dashboard();
   },
   
@@ -518,7 +516,6 @@ const Views = {
     const role = App.profile.role || '';
     const subscriptionEnds = App.profile.subscription_ends_at;
     
-    // ✅ واجهة السائقين (تكسي/توك توك/دلفري) - استقبال تلقائي للطلبات (بدون أزرار)
     if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(role)) {
       const earnings = App.profile.earnings_today || 0;
       
@@ -578,7 +575,6 @@ const Views = {
       `;
     }
     
-    // ✅ واجهة صاحب المتجر - مع أزرار تحكم يدوي (مفتوح/مغلق)
     if (role === 'صاحب متجر') {
       const salesToday = App.profile.sales_today || 0;
       const storeStatus = App.profile.store_status || 'مغلق';
@@ -631,7 +627,6 @@ const Views = {
       `;
     }
     
-    // ✅ واجهة المدير
     if (role === 'admin') {
       return `
         <div class="card glass-panel">
@@ -646,7 +641,6 @@ const Views = {
       `;
     }
     
-    // ✅ الواجهة الافتراضية
     return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span></p></div>` +
       `<div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
@@ -819,7 +813,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module (✅ تم التصحيح هنا)
+// 🔐 Auth Module (✅ تم التصحيح الكامل هنا)
 // ==========================================
 const Auth = {
   login: async () => {
@@ -865,8 +859,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        // ✅ التصحيح: إضافة '' قبل upData
-        const { error: upErr,  upData } = await App.db.storage
+        const { error: upErr, data: upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
@@ -879,11 +872,19 @@ const Auth = {
       }
     }
     
-    // ✅ التصحيح الرئيسي: إضافة '' قبل authData و options.data
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ التصحيح الرئيسي: signUp مع options.data
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {  { name, phone, role, gender, age: parseInt(age) } }
+      options: {
+        data: { 
+          name: name,
+          phone: phone,
+          role: role,
+          gender: gender,
+          age: parseInt(age)
+        }
+      }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -905,8 +906,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة 'data:' قبل upData
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -933,8 +933,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة 'data:' قبل upData
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -962,8 +961,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة '' قبل upData
-          const { error: upErr,  upData } = await App.db.storage
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -1041,7 +1039,6 @@ const MapUtils = {
     });
   },
   
-  // ✅ دالة خريطة الحرارة للدلفري
   initHeatMap: () => {
     if (App.map) { App.map.remove(); App.map = null; }
     const mapEl = document.getElementById('map');
@@ -1050,7 +1047,6 @@ const MapUtils = {
     App.map = L.map('map').setView(App.userLocation || CONFIG.MAP_CENTER, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(App.map);
     
-    // ✅ محاكاة بيانات المناطق الساخنة (يتم استبدالها ببيانات حقيقية من Supabase)
     const heatData = [
       [33.3152, 44.3661, 0.9],
       [33.3200, 44.3700, 0.7],
@@ -1060,7 +1056,6 @@ const MapUtils = {
       [33.3400, 44.3900, 0.6],
     ];
     
-    // ✅ عرض دوائر ملونة بدلاً من Heatmap plugin للسهولة
     heatData.forEach(([lat, lng, intensity]) => {
       const color = intensity > 0.7 ? '#ef4444' : intensity > 0.4 ? '#f59e0b' : '#22c55e';
       const radius = intensity * 300;
@@ -1146,18 +1141,17 @@ const Profile = {
 };
 
 // ==========================================
-// 🚗 Driver Module (للسائقين والدلفري) - بدون تحكم يدوي
+// 🚗 Driver Module
 // ==========================================
 const Driver = {
   fetchNearbyTrips: async () => {
     if (!App.userLocation) return alert('⚠️ يرجى تفعيل الموقع أولاً');
     alert('🔍 جاري البحث عن رحلات قريبة...');
-    // ✅ هنا يتم إضافة كود جلب الرحلات من Supabase
   }
 };
 
 // ==========================================
-// 🏪 Store Module (لأصحاب المتاجر) - مع تحكم يدوي
+// 🏪 Store Module
 // ==========================================
 const Store = {
   toggleStatus: async (status) => {
@@ -1165,7 +1159,7 @@ const Store = {
     try {
       await App.db.from('profiles').update({ store_status: status }).eq('id', App.user.id);
       if (App.profile) App.profile.store_status = status;
-      App.router('dashboard'); // إعادة تحميل الواجهة
+      App.router('dashboard');
       alert(status === 'مفتوح' ? '🟢 متجرك مفتوح الآن' : '🔴 تم إغلاق المتجر');
     } catch (err) {
       alert('❌ فشل تحديث حالة المتجر: ' + err.message);
@@ -1174,12 +1168,10 @@ const Store = {
   
   fetchNewOrders: async () => {
     alert('🔔 جاري جلب الطلبات الجديدة...');
-    // ✅ هنا يتم إضافة كود جلب الطلبات من Supabase
   },
   
   trackDeliveries: async () => {
     alert('🚚 جاري تتبع طلبات التوصيل...');
-    // ✅ هنا يتم إضافة كود تتبع التوصيل
   }
 };
 
@@ -1230,8 +1222,8 @@ const Rating = {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    // ✅ التصحيح: إضافة '' قبل existing
-    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    // ✅ التصحيح: data: existing
+    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
@@ -1478,7 +1470,7 @@ window.confirm = (message) => {
 };
 
 // ==========================================
-// 🔔 Notifications Module - إشعارات صوتية ومرئية (يستخدم نغمة النظام تلقائياً في الخلفية)
+// 🔔 Notifications Module
 // ==========================================
 const Notifications = {
   audioCtx: null,
@@ -1486,12 +1478,10 @@ const Notifications = {
   enabled: true,
   
   init: () => {
-    // ✅ تهيئة سياق الصوت البرمجي
     try {
       Notifications.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) { console.warn('🔇 Web Audio غير مدعوم'); }
     
-    // ✅ إنشاء حاوية الإشعارات المرئية
     if (!document.getElementById('toast-container')) {
       Notifications.toastContainer = document.createElement('div');
       Notifications.toastContainer.id = 'toast-container';
@@ -1505,17 +1495,14 @@ const Notifications = {
       Notifications.toastContainer = document.getElementById('toast-container');
     }
     
-    // ✅ تحميل التفضيل
     const saved = localStorage.getItem('notifications_enabled');
     if (saved !== null) Notifications.enabled = saved === 'true';
     
-    // ✅ طلب إذن الإشعارات
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   },
   
-  // ✅ توليد نغمة إشعار قياسية برمجياً (تحاكي صوت النظام)
   playTone: () => {
     if (!Notifications.enabled || !Notifications.audioCtx) return;
     try {
@@ -1534,13 +1521,11 @@ const Notifications = {
     } catch (e) {}
   },
   
-  // ✅ عرض الإشعار الكامل (صوتي + مرئي + نظام)
   show: (title, message, type = 'info', onClick = null) => {
     if (!Notifications.enabled) return;
-    Notifications.playTone(); // 🔊 نغمة برمجية عند فتح التطبيق
+    Notifications.playTone();
     Notifications.showToast(title, message, type, onClick);
     
-    // 📱 إشعار الخلفية (يستخدم نغمة الهاتف الافتراضية تلقائياً)
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(title, {
         body: message,
@@ -1599,13 +1584,11 @@ const Notifications = {
   subscribeToUpdates: () => {
     if (!App.user?.id) return;
     
-    // 🔔 مراقبة الرسائل الجديدة
     App.db.channel('messages')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${App.user.id}` }, 
         (payload) => { if (payload.new.sender_id !== App.user.id) Notifications.show('💬 رسالة جديدة', 'لديك رسالة جديدة من الإدارة', 'info', () => App.router('profile')); })
       .subscribe();
       
-    // 🔔 مراقبة الطلبات الجديدة (للسائقين)
     if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(App.profile?.role)) {
       App.db.channel('trips')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trips', filter: `status=eq.قيد الانتظار` },
@@ -1613,7 +1596,6 @@ const Notifications = {
         .subscribe();
     }
     
-    // 🔔 مراقبة طلبات المتاجر (لأصحاب المتاجر)
     if (App.profile?.role === 'صاحب متجر') {
       App.db.channel('orders')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${App.user.id}` },
@@ -1637,11 +1619,9 @@ if (!document.getElementById('notif-anim-style')) {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     App.init();
-    // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
     if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
   });
 } else {
   App.init();
-  // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
   if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
 }
