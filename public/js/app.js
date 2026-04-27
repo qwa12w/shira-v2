@@ -1,6 +1,7 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v3.4
-// ✅ التحديث النهائي: نقل شريط التنقل إلى الملف الشخصي فقط + إصلاحات الواجهة
+// شراع | Shira Platform - Core Application Engine v4.1
+// ✅ التحديث: واجهات مخصصة + استقبال تلقائي للسائقين + تحكم يدوي للمتاجر
+// ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
 
 const App = {
@@ -15,6 +16,7 @@ const App = {
   routes: {},
   userLocation: null,
   destLocation: null,
+  subscriptionTimer: null,
 
   init: async () => {
     try {
@@ -86,7 +88,7 @@ const App = {
 
       App.profile = profile;
       localStorage.setItem('lastRole', profile.role || '');
-      localStorage.setItem('lastRoute', (profile.role === 'زبون') ? 'home' : 'dashboard');
+      localStorage.setItem('lastRoute', App.getInitialRouteByRole(profile.role));
 
       if (profile.status === 'قيد المراجعة') {
         Utils.hideSkeleton('#app-view');
@@ -99,12 +101,21 @@ const App = {
       
       App.startLiveTracking();
       Utils.hideSkeleton('#app-view');
-      App.router(App.getInitialRoute());
+      App.router(App.getInitialRouteByRole(profile.role));
     } catch (err) {
       console.error('Session check error:', err);
       Utils.hideSkeleton('#app-view');
       App.hardLogout();
     }
+  },
+
+  getInitialRouteByRole: (role) => {
+    if (!role) return 'home';
+    const driverRoles = ['سائق تكسي', 'سائق توك توك', 'دلفري'];
+    if (driverRoles.includes(role)) return 'dashboard';
+    if (role === 'صاحب متجر') return 'dashboard';
+    if (role === 'admin') return 'dashboard';
+    return 'home';
   },
 
   showStatusGate: (icon, title, msg) => {
@@ -126,6 +137,7 @@ const App = {
 
   logout: async () => {
     if (App.gpsWatchId) navigator.geolocation.clearWatch(App.gpsWatchId);
+    if (App.subscriptionTimer) clearInterval(App.subscriptionTimer);
     await App.db.auth.signOut();
     try { localStorage.clear(); } catch {}
     App.router('role-select');
@@ -133,6 +145,7 @@ const App = {
 
   hardLogout: async () => {
     if (App.gpsWatchId) navigator.geolocation.clearWatch(App.gpsWatchId);
+    if (App.subscriptionTimer) clearInterval(App.subscriptionTimer);
     await App.db.auth.signOut();
     try { localStorage.clear(); } catch {}
     location.replace('/');
@@ -141,7 +154,6 @@ const App = {
   secureLogout: async () => {
     if (!App.profile || !App.profile.phone) return alert('❌ بيانات غير مكتملة');
     
-    // ✅ استخدام النافذة الأنيقة للتأكيد
     const confirmed = await new Promise((resolve) => {
       showCustomAlert(
         '⚠️ تحذير هام',
@@ -193,12 +205,11 @@ const App = {
     
     const isAuth = ['login', 'register', 'role-select'].includes(route);
     
-    // ✅ إخفاء زر الرجوع في الصفحات الرئيسية
     if (backBtn) {
       backBtn.classList.toggle('hidden', ['home', 'dashboard', 'login'].includes(route));
       backBtn.onclick = () => {
         const role = (App.profile && App.profile.role) ? App.profile.role : '';
-        App.router(role === 'زبون' ? 'home' : 'dashboard');
+        App.router(App.getInitialRouteByRole(role));
       };
     }
     
@@ -217,6 +228,9 @@ const App = {
         case 'request-ride': container.innerHTML = Views.requestRide(payload); if (headerTitle) headerTitle.innerText = 'طلب رحلة'; break;
         case 'shopping': container.innerHTML = Views.shopping(); if (headerTitle) headerTitle.innerText = 'التسوق'; break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
+        case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
+        case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
+        case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
       Utils.hideSkeleton('#app-view');
@@ -224,9 +238,11 @@ const App = {
     
     App.currentRoute = route;
     
-    // ✅ إعادة تهيئة الخريطة إذا لزم الأمر
     if (route === 'request-ride') {
       setTimeout(() => MapUtils.init(payload), 100);
+    }
+    if (route === 'delivery-map') {
+      setTimeout(() => MapUtils.initHeatMap(), 100);
     }
   },
 
@@ -240,8 +256,6 @@ const App = {
     }
     const profileBtn = document.getElementById('profile-btn');
     if (profileBtn) profileBtn.addEventListener('click', () => App.router('profile'));
-    
-    // ✅ تم إزالة مستمع الشريط السفلي العالمي لأنه أصبح داخل الملف الشخصي
     
     const modalClose = document.querySelector('.modal-close');
     if (modalClose) {
@@ -263,11 +277,43 @@ const App = {
         console.warn('⚠️ فشل تحديث الموقع:', err);
       }
     }, (err) => console.warn('GPS Error:', err), { enableHighAccuracy: true });
+  },
+
+  startSubscriptionTimer: (endDate) => {
+    if (App.subscriptionTimer) clearInterval(App.subscriptionTimer);
+    
+    const updateTimer = () => {
+      const now = new Date();
+      const end = new Date(endDate);
+      const diff = end - now;
+      
+      if (diff <= 0) {
+        const timerEl = document.getElementById('subscription-timer');
+        if (timerEl) {
+          timerEl.innerText = 'انتهى الاشتراك';
+          timerEl.style.color = '#ef4444';
+        }
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      const timerEl = document.getElementById('subscription-timer');
+      if (timerEl) {
+        timerEl.innerText = `${days}ي ${hours}س ${minutes}د`;
+        timerEl.style.color = diff < 24 * 60 * 60 * 1000 ? '#ef4444' : 'var(--primary)';
+      }
+    };
+    
+    updateTimer();
+    App.subscriptionTimer = setInterval(updateTimer, 60000);
   }
 };
 
 // ==========================================
-// 🎨 Views Module
+// 🎨 Views Module - واجهات مخصصة لكل دور
 // ==========================================
 const Views = {
   roleSelect: () => {
@@ -278,6 +324,7 @@ const Views = {
       `<div class="card" onclick="App.router('register', 'دلفري')"><div class="icon">🏍️</div><h3>دلفري</h3></div>` +
       `<button onclick="App.router('login')" class="btn btn-outline mt-2">لديك حساب؟ سجل دخول</button>`;
   },
+  
   login: () => {
     return `<div class="card glass-panel">
       <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="login-phone" class="input-field" placeholder="07..."></div>
@@ -286,6 +333,7 @@ const Views = {
       <button onclick="App.router('role-select')" class="btn btn-outline mt-2">إنشاء حساب جديد</button>
     </div>`;
   },
+  
   register: (role) => {
     const commonFields = `
       <div class="form-group">
@@ -321,6 +369,7 @@ const Views = {
         <input type="password" id="reg-pass-confirm" class="input-field" minlength="6" required>
       </div>
     `;
+
     const roleFields = {
       'زبون': '',
       'سائق تكسي': `
@@ -421,7 +470,9 @@ const Views = {
         </div>
       `
     };
+
     const extraFields = roleFields[role] || '';
+    
     return `
       <form id="reg-form" style="text-align: right;">
         ${commonFields}
@@ -431,11 +482,24 @@ const Views = {
       <button onclick="App.router('login')" class="btn btn-outline">⬅️ رجوع لتسجيل الدخول</button>
     `;
   },
+  
   home: () => {
-    return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
-      `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
-      `<div class="card" onclick="App.router('shopping')"><div class="icon">🛒</div><h3>تسوق</h3></div>`;
+    if (!App.profile) return '<div class="text-center mt-2">جاري التحميل...</div>';
+    
+    const role = App.profile.role;
+    
+    // ✅ واجهة الزبون فقط
+    if (role === 'زبون') {
+      return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
+        `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
+        `<div class="card" onclick="App.router('shopping')"><div class="icon">🛒</div><h3>تسوق</h3></div>` +
+        `<div class="card" onclick="App.router('my-orders')"><div class="icon">📦</div><h3>طلباتي</h3></div>`;
+    }
+    
+    // ✅ توجيه الأدوار الأخرى للوحة التحكم
+    return Views.dashboard();
   },
+  
   shopping: () => {
     return `<div class="text-center" style="padding: 40px 20px;">
       <div style="font-size: 60px; margin-bottom: 20px;">🛒</div>
@@ -443,16 +507,190 @@ const Views = {
       <p style="color: var(--text-muted); margin-bottom: 30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
       <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
   },
+  
   dashboard: () => {
     if (!App.profile) {
       setTimeout(() => App.router('login'), 100);
       return '<div class="text-center mt-2">جاري التحميل...</div>';
     }
+    
     const name = App.profile.name || 'مستخدم';
     const role = App.profile.role || '';
+    const subscriptionEnds = App.profile.subscription_ends_at;
+    
+    // ✅ واجهة السائقين (تكسي/توك توك/دلفري) - استقبال تلقائي للطلبات (بدون أزرار)
+    if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(role)) {
+      const earnings = App.profile.earnings_today || 0;
+      
+      if (subscriptionEnds) {
+        setTimeout(() => App.startSubscriptionTimer(subscriptionEnds), 100);
+      }
+      
+      return `
+        <div class="card glass-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3>👋 ${name}</h3>
+            <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span>
+          </div>
+          
+          <div class="form-group" style="background:#dcfce7; padding:12px; border-radius:12px; margin-bottom:15px; border:2px solid #22c55e;">
+            <label style="font-weight:600; color:#166534;">🟢 أنت نشط حالياً</label>
+            <p style="font-size:13px; color:#166534; margin:5px 0 0;">
+              ستستلم طلبات جديدة بشكل مستمر حتى انتهاء اشتراكك
+            </p>
+          </div>
+          
+          ${subscriptionEnds ? `
+          <div class="form-group" style="background:#fff3cd; padding:12px; border-radius:12px; margin-bottom:15px;">
+            <label style="font-weight:600;">⏰ الوقت المتبقي للاشتراك:</label>
+            <div id="subscription-timer" style="font-size:1.2rem; font-weight:bold; margin-top:5px;">جاري الحساب...</div>
+            <small style="color:var(--text-muted);">بعد الانتهاء سيتوقف استلام الطلبات تلقائياً</small>
+          </div>` : ''}
+          
+          <div class="card" style="margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span>💰 أرباح اليوم</span>
+              <strong style="font-size:1.3rem; color:var(--primary);">${earnings.toLocaleString()} د.ع</strong>
+            </div>
+          </div>
+        </div>
+        
+        ${role === 'دلفري' ? `
+        <div class="card" onclick="App.router('delivery-map')">
+          <div class="icon">🔥</div>
+          <h3>خريطة المناطق الساخنة</h3>
+          <p style="color:var(--text-muted); font-size:13px;">🔴 عالية الطلب • 🟢 منخفضة الطلب</p>
+        </div>` : `
+        <div class="card" onclick="Driver.fetchNearbyTrips()">
+          <div class="icon">📍</div>
+          <h3>الرحلات القريبة</h3>
+          <p style="color:var(--text-muted); font-size:13px;">اضغط لعرض الطلبات القريبة منك</p>
+        </div>`}
+        
+        <div class="card" onclick="App.router('profile')">
+          <div class="icon">📊</div>
+          <h3>إحصائياتي</h3>
+        </div>
+        <div class="card" onclick="App.router('my-orders')">
+          <div class="icon">📋</div>
+          <h3>سجل الرحلات</h3>
+        </div>
+      `;
+    }
+    
+    // ✅ واجهة صاحب المتجر - مع أزرار تحكم يدوي (مفتوح/مغلق)
+    if (role === 'صاحب متجر') {
+      const salesToday = App.profile.sales_today || 0;
+      const storeStatus = App.profile.store_status || 'مغلق';
+      
+      return `
+        <div class="card glass-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3>👋 ${name}</h3>
+            <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span>
+          </div>
+          
+          <div class="form-group" style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:15px;">
+            <label style="font-weight:600;">🏪 حالة المتجر:</label>
+            <div style="display:flex; gap:10px; margin-top:8px;">
+              <button onclick="Store.toggleStatus('مفتوح')" class="btn ${storeStatus === 'مفتوح' ? 'btn-primary' : 'btn-outline'}" style="flex:1; padding:10px;">🟢 مفتوح</button>
+              <button onclick="Store.toggleStatus('مغلق')" class="btn ${storeStatus === 'مغلق' ? 'btn-danger' : 'btn-outline'}" style="flex:1; padding:10px;">🔴 مغلق</button>
+            </div>
+            <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">
+              ${storeStatus === 'مفتوح' ? 'متجرك يستقبل طلبات جديدة الآن' : 'متجرك لا يستقبل طلبات جديدة حالياً'}
+            </p>
+          </div>
+          
+          <div class="card" style="margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span>📊 مبيعات اليوم</span>
+              <strong style="font-size:1.3rem; color:var(--primary);">${salesToday.toLocaleString()} د.ع</strong>
+            </div>
+          </div>
+        </div>
+        
+        <div class="card" onclick="App.router('store-products')">
+          <div class="icon">📦</div>
+          <h3>إدارة المنتجات</h3>
+          <p style="color:var(--text-muted); font-size:13px;">إضافة/تعديل/حذف المنتجات</p>
+        </div>
+        <div class="card" onclick="Store.fetchNewOrders()">
+          <div class="icon">🔔</div>
+          <h3>الطلبات الجديدة</h3>
+          <p style="color:var(--text-muted); font-size:13px;">استقبال ومتابعة الطلبات</p>
+        </div>
+        <div class="card" onclick="Store.trackDeliveries()">
+          <div class="icon">🚚</div>
+          <h3>متابعة التوصيل</h3>
+          <p style="color:var(--text-muted); font-size:13px;">حالة طلبات التوصيل</p>
+        </div>
+        <div class="card" onclick="App.router('profile')">
+          <div class="icon">📈</div>
+          <h3>الإحصائيات</h3>
+        </div>
+      `;
+    }
+    
+    // ✅ واجهة المدير
+    if (role === 'admin') {
+      return `
+        <div class="card glass-panel">
+          <h3>👋 لوحة تحكم المدير</h3>
+          <p style="color:var(--text-muted);">إدارة شاملة للتطبيق</p>
+        </div>
+        <div class="card"><div class="icon">👥</div><h3>المستخدمين</h3></div>
+        <div class="card"><div class="icon">🚗</div><h3>السائقين</h3></div>
+        <div class="card"><div class="icon">🏪</div><h3>المتاجر</h3></div>
+        <div class="card"><div class="icon">📈</div><h3>الإحصائيات</h3></div>
+        <div class="card"><div class="icon">⚙️</div><h3>الإعدادات</h3></div>
+      `;
+    }
+    
+    // ✅ الواجهة الافتراضية
     return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span></p></div>` +
       `<div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
+  
+  myOrders: () => {
+    return `<div class="text-center" style="padding:40px 20px;">
+      <div style="font-size:60px; margin-bottom:20px;">📦</div>
+      <h2>طلباتي</h2>
+      <p style="color:var(--text-muted); margin-bottom:30px;">سجل جميع طلباتك السابقة والحالية</p>
+      <button onclick="App.router('home')" class="btn btn-outline">العودة</button>
+    </div>`;
+  },
+  
+  storeProducts: () => {
+    return `<div class="text-center" style="padding:40px 20px;">
+      <div style="font-size:60px; margin-bottom:20px;">📦</div>
+      <h2>إدارة المنتجات</h2>
+      <p style="color:var(--text-muted); margin-bottom:30px;">إضافة، تعديل، وحذف المنتجات</p>
+      <button class="btn btn-primary" style="margin-bottom:20px;">➕ إضافة منتج جديد</button>
+      <div class="card" style="margin-bottom:10px; text-align:right;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong>منتج مثال</strong>
+            <p style="color:var(--text-muted); font-size:13px; margin:5px 0;">السعر: 5,000 د.ع</p>
+          </div>
+          <span class="badge" style="background:var(--green); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">✅ متوفر</span>
+        </div>
+      </div>
+      <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>
+    </div>`;
+  },
+  
+  deliveryMap: () => {
+    return `<div class="map-wrapper" style="height:400px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
+      <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:15px;">
+        <h4 style="margin-bottom:10px;">🔥 خريطة المناطق الساخنة</h4>
+        <div style="display:flex; gap:10px; font-size:13px;">
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:#ef4444; border-radius:50%;"></span> طلبات كثيرة</span>
+          <span style="display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:#22c55e; border-radius:50%;"></span> طلبات قليلة</span>
+        </div>
+      </div>
+      <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>`;
+  },
+  
   requestRide: (type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
     return `<div class="map-wrapper" style="height:300px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>` +
@@ -462,6 +700,7 @@ const Views = {
       `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--primary); font-size:20px;"><span id="price-val">${basePrice}</span> د.ع</strong></div>` +
       `<button onclick="Trips.request('${type}')" class="btn btn-primary">🚀 تأكيد الرحلة</button>`;
   },
+  
   profile: () => {
     if (!App.profile) {
       setTimeout(() => App.router('login'), 100);
@@ -509,7 +748,6 @@ const Views = {
       </div>
     ` : '';
     
-    // ✅ شريط التنقل يظهر هنا فقط (داخل الملف الشخصي)
     const bottomNavInProfile = `
       <div class="profile-bottom-nav" style="
         position: fixed; bottom: 0; left: 0; right: 0;
@@ -530,7 +768,7 @@ const Views = {
           <span style="font-size: 1.3rem;">🏠</span>
           <span>الرئيسية</span>
         </button>
-        <button onclick="App.router('orders')" style="
+        <button onclick="App.router('my-orders')" style="
           flex: 1; text-align: center; padding: 8px 5px;
           background: none; border: none; cursor: pointer;
           font-size: 0.75rem; display: flex;
@@ -626,7 +864,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr, data: upData } = await App.db.storage
+        const { error: upErr,  upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
@@ -638,10 +876,10 @@ const Auth = {
         console.warn('⚠️ فشل رفع الصورة الشخصية:', e);
       }
     }
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: { data: { name, phone, role, gender, age: parseInt(age) } }
+      options: {  { name, phone, role, gender, age: parseInt(age) } }
     });
     if (authErr) return alert('❌ ' + authErr.message);
     if (!authData?.user) return alert('❌ فشل إنشاء الحساب، حاول مرة أخرى');
@@ -715,7 +953,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -746,7 +984,6 @@ const Auth = {
     const { error: profErr } = await App.db.from('profiles').insert(profileData);
     if (profErr) return alert('❌ خطأ في حفظ البيانات: ' + profErr.message);
 
-    // ✅ النافذة الأنيقة بدلاً من alert
     const title = role === 'زبون' ? '✅ تم إنشاء حسابك!' : '✅ تم تسجيل طلبك!';
     const message = role === 'زبون' ? 'جاري الدخول...' : 'سيراجعه فريق الإدارة خلال 24 ساعة.';
     const onConfirm = role === 'زبون' ? () => location.reload() : () => App.router('login');
@@ -791,6 +1028,43 @@ const MapUtils = {
       }
     });
   },
+  
+  // ✅ دالة خريطة الحرارة للدلفري
+  initHeatMap: () => {
+    if (App.map) { App.map.remove(); App.map = null; }
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+    
+    App.map = L.map('map').setView(App.userLocation || CONFIG.MAP_CENTER, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(App.map);
+    
+    // ✅ محاكاة بيانات المناطق الساخنة (يتم استبدالها ببيانات حقيقية من Supabase)
+    const heatData = [
+      [33.3152, 44.3661, 0.9],
+      [33.3200, 44.3700, 0.7],
+      [33.3100, 44.3600, 0.8],
+      [33.2800, 44.3200, 0.3],
+      [33.2900, 44.3300, 0.2],
+      [33.3400, 44.3900, 0.6],
+    ];
+    
+    // ✅ عرض دوائر ملونة بدلاً من Heatmap plugin للسهولة
+    heatData.forEach(([lat, lng, intensity]) => {
+      const color = intensity > 0.7 ? '#ef4444' : intensity > 0.4 ? '#f59e0b' : '#22c55e';
+      const radius = intensity * 300;
+      L.circle([lat, lng], {
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.3,
+        radius: radius
+      }).addTo(App.map).bindPopup(`كثافة الطلب: ${Math.round(intensity * 100)}%`);
+    });
+    
+    if (App.userLocation) {
+      App.userMarker = L.marker([App.userLocation.lat, App.userLocation.lng]).addTo(App.map).bindPopup('📍 موقعك').openPopup();
+    }
+  },
+  
   calculateDistance: (lat1, lon1, lat2, lon2) => {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -799,6 +1073,7 @@ const MapUtils = {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   },
+  
   calculatePrice: (distance, type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
     const pricePerKm = (type === 'تاكسي') ? 1000 / 3 : 750 / 3;
@@ -859,6 +1134,44 @@ const Profile = {
 };
 
 // ==========================================
+// 🚗 Driver Module (للسائقين والدلفري) - بدون تحكم يدوي
+// ==========================================
+const Driver = {
+  fetchNearbyTrips: async () => {
+    if (!App.userLocation) return alert('⚠️ يرجى تفعيل الموقع أولاً');
+    alert('🔍 جاري البحث عن رحلات قريبة...');
+    // ✅ هنا يتم إضافة كود جلب الرحلات من Supabase
+  }
+};
+
+// ==========================================
+// 🏪 Store Module (لأصحاب المتاجر) - مع تحكم يدوي
+// ==========================================
+const Store = {
+  toggleStatus: async (status) => {
+    if (!App.user?.id) return;
+    try {
+      await App.db.from('profiles').update({ store_status: status }).eq('id', App.user.id);
+      if (App.profile) App.profile.store_status = status;
+      App.router('dashboard'); // إعادة تحميل الواجهة
+      alert(status === 'مفتوح' ? '🟢 متجرك مفتوح الآن' : '🔴 تم إغلاق المتجر');
+    } catch (err) {
+      alert('❌ فشل تحديث حالة المتجر: ' + err.message);
+    }
+  },
+  
+  fetchNewOrders: async () => {
+    alert('🔔 جاري جلب الطلبات الجديدة...');
+    // ✅ هنا يتم إضافة كود جلب الطلبات من Supabase
+  },
+  
+  trackDeliveries: async () => {
+    alert('🚚 جاري تتبع طلبات التوصيل...');
+    // ✅ هنا يتم إضافة كود تتبع التوصيل
+  }
+};
+
+// ==========================================
 // ⭐ Rating Module
 // ==========================================
 const Rating = {
@@ -905,7 +1218,7 @@ const Rating = {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
@@ -1015,7 +1328,7 @@ const AboutShira = {
         <h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
         <p style="color:var(--text-muted); margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
         <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:20px; text-align:right;">
-          <p><strong>📱 الإصدار:</strong> 3.0.0</p>
+          <p><strong>📱 الإصدار:</strong> 4.1.0</p>
           <p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
           <p><strong>📍 المقر:</strong> بغداد، العراق</p>
           <p><strong>📧 الدعم:</strong> support@shira.app</p>
