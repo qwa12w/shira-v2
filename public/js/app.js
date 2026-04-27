@@ -231,9 +231,6 @@ const App = {
         case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
         case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
         case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
-        // ✅ إضافات جديدة لإدارة المتاجر والمنتجات للمدير
-        case 'admin-stores': container.innerHTML = Views.adminStores(); if (headerTitle) headerTitle.innerText = 'إدارة المتاجر'; break;
-        case 'admin-store-products': container.innerHTML = Views.adminStoreProducts(payload); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
       Utils.hideSkeleton('#app-view');
@@ -643,7 +640,7 @@ const Views = {
         </div>
         <div class="card"><div class="icon">👥</div><h3>المستخدمين</h3></div>
         <div class="card"><div class="icon">🚗</div><h3>السائقين</h3></div>
-        <div class="card" onclick="App.router('admin-stores')"><div class="icon">🏪</div><h3>إدارة المتاجر</h3><p style="color:var(--text-muted); font-size:13px;">تعديل المنتجات، التحكم في الحالة</p></div>
+        <div class="card"><div class="icon">🏪</div><h3>المتاجر</h3></div>
         <div class="card"><div class="icon">📈</div><h3>الإحصائيات</h3></div>
         <div class="card"><div class="icon">⚙️</div><h3>الإعدادات</h3></div>
       `;
@@ -818,48 +815,6 @@ const Views = {
       ${supportSection}
       ${bottomNavInProfile}
     `;
-  },
-  
-  // ✅ إضافات جديدة لإدارة المتاجر والمنتجات للمدير
-  adminStores: () => {
-    return `
-      <div style="margin-bottom:20px;">
-        <input type="text" id="store-search" class="input-field" placeholder="🔍 بحث عن متجر..." style="width:100%; margin-bottom:10px;">
-      </div>
-      <div id="stores-list" style="display:flex; flex-direction:column; gap:10px;">
-        <div class="skeleton" style="height:80px; border-radius:12px;"></div>
-        <div class="skeleton" style="height:80px; border-radius:12px;"></div>
-      </div>
-    `;
-  },
-  
-  adminStoreProducts: (storeId) => {
-    return `
-      <div style="margin-bottom:15px;">
-        <button onclick="App.router('admin-stores')" class="btn btn-outline" style="padding:8px 16px;">↩️ عودة للمتاجر</button>
-      </div>
-      
-      <div class="card glass-panel" style="margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-          <h3 id="store-name" style="margin:0;">جاري التحميل...</h3>
-          <button onclick="Admin.openAddProductModal('${storeId}')" class="btn btn-primary" style="padding:10px 20px;">➕ إضافة منتج</button>
-        </div>
-      </div>
-      
-      <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
-        <input type="text" id="product-search" class="input-field" placeholder="🔍 بحث عن منتج..." style="flex:1; min-width:200px;">
-        <select id="product-filter" class="input-field" style="width:auto;">
-          <option value="all">كل المنتجات</option>
-          <option value="available">✅ متوفر</option>
-          <option value="unavailable">❌ منتهي</option>
-        </select>
-      </div>
-      
-      <div id="products-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:15px;">
-        <div class="skeleton" style="height:200px; border-radius:12px;"></div>
-        <div class="skeleton" style="height:200px; border-radius:12px;"></div>
-      </div>
-    `;
   }
 };
 
@@ -910,7 +865,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        // ✅ التصحيح: إضافة 'data:' قبل upData
+        // ✅ التصحيح: إضافة '' قبل upData
         const { error: upErr,  upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
@@ -950,7 +905,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة 'data:' قبل upData
+          // ✅ التصحيح: إضافة '' قبل upData
           const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
@@ -978,7 +933,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة 'data:' قبل upData
+          // ✅ التصحيح: إضافة '' قبل upData
           const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
@@ -1007,8 +962,8 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة 'data:' قبل upData
-          const { error: upErr,  upData } = await App.db.storage
+          // ✅ التصحيح: إضافة '' قبل upData
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -1677,248 +1632,6 @@ if (!document.getElementById('notif-anim-style')) {
 }
 
 // ==========================================
-// 👨‍💼 Admin Module - إدارة المتاجر والمنتجات (إضافة جديدة)
-// ==========================================
-const Admin = {
-  
-  // جلب قائمة المتاجر
-  fetchStores: async () => {
-    const { data, error } = await App.db
-      .from('profiles')
-      .select('id, name, phone, store_type, store_status, created_at')
-      .eq('role', 'صاحب متجر')
-      .order('created_at', { ascending: false });
-    
-    if (error) return console.error('❌ Failed to fetch stores:', error);
-    
-    const container = document.getElementById('stores-list');
-    if (!container) return;
-    
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="text-center" style="color:var(--text-muted); padding:20px;">لا توجد متاجر مسجلة</div>';
-      return;
-    }
-    
-    container.innerHTML = data.map(store => `
-      <div class="card" style="padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-        <div>
-          <strong style="font-size:1.1rem;">${store.name || 'بدون اسم'}</strong>
-          <p style="color:var(--text-muted); font-size:13px; margin:5px 0;">
-            📱 ${store.phone} • 🏪 ${store.store_type || 'غير محدد'}
-          </p>
-          <span class="badge" style="background:${store.store_status === 'مفتوح' ? '#22c55e' : '#ef4444'}; color:white; padding:4px 10px; border-radius:20px; font-size:12px;">
-            ${store.store_status === 'مفتوح' ? '🟢 مفتوح' : '🔴 مغلق'}
-          </span>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button onclick="Admin.viewStoreProducts('${store.id}', '${store.name}')" class="btn btn-outline" style="padding:8px 16px; font-size:13px;">📦 المنتجات</button>
-          <button onclick="Admin.toggleStoreStatus('${store.id}', '${store.store_status}')" class="btn ${store.store_status === 'مفتوح' ? 'btn-danger' : 'btn-primary'}" style="padding:8px 16px; font-size:13px;">
-            ${store.store_status === 'مفتوح' ? '🔴 إغلاق' : '🟢 تفعيل'}
-          </button>
-        </div>
-      </div>
-    `).join('');
-  },
-  
-  // عرض منتجات متجر معين
-  viewStoreProducts: async (storeId, storeName) => {
-    const nameEl = document.getElementById('store-name');
-    if (nameEl) nameEl.innerText = `🏪 ${storeName}`;
-    
-    const { data, error } = await App.db
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('created_at', { ascending: false });
-    
-    if (error) return console.error('❌ Failed to fetch products:', error);
-    
-    const container = document.getElementById('products-list');
-    if (!container) return;
-    
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="text-center" style="color:var(--text-muted); padding:40px;">لا توجد منتجات في هذا المتجر</div>';
-      return;
-    }
-    
-    container.innerHTML = data.map(product => `
-      <div class="card" style="padding:15px; position:relative;" data-store-id="${storeId}">
-        <button onclick="Admin.deleteProduct('${product.id}')" style="position:absolute; top:10px; left:10px; background:#ef4444; color:white; border:none; width:24px; height:24px; border-radius:50%; font-size:14px; cursor:pointer;">&times;</button>
-        
-        ${product.image_url ? `<img src="${product.image_url}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">` : ''}
-        
-        <strong style="font-size:1.1rem;">${product.name}</strong>
-        <p style="color:var(--text-muted); font-size:13px; margin:5px 0; min-height:40px;">${product.description || 'بدون وصف'}</p>
-        
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
-          <span style="font-weight:600; color:var(--primary);">${product.price.toLocaleString()} د.ع</span>
-          <button onclick="Admin.toggleProductAvailability('${product.id}', ${product.is_available})" 
-            class="btn ${product.is_available ? 'btn-outline' : 'btn-primary'}" 
-            style="padding:6px 12px; font-size:12px;">
-            ${product.is_available ? '✅ متوفر' : '❌ منتهي'}
-          </button>
-        </div>
-      </div>
-    `).join('');
-    
-    // ✅ إضافة فلترة بحث بسيطة
-    const searchInput = document.getElementById('product-search');
-    const filterSelect = document.getElementById('product-filter');
-    
-    const applyFilters = () => {
-      const query = searchInput?.value.toLowerCase() || '';
-      const status = filterSelect?.value || 'all';
-      
-      document.querySelectorAll('#products-list .card').forEach(card => {
-        const name = card.querySelector('strong')?.innerText.toLowerCase() || '';
-        const isAvailable = card.querySelector('button[onclick*="toggleProductAvailability"]')?.innerText.includes('متوفر');
-        
-        const matchesSearch = name.includes(query);
-        const matchesStatus = status === 'all' || 
-          (status === 'available' && isAvailable) || 
-          (status === 'unavailable' && !isAvailable);
-        
-        card.style.display = matchesSearch && matchesStatus ? 'block' : 'none';
-      });
-    };
-    
-    searchInput?.addEventListener('input', applyFilters);
-    filterSelect?.addEventListener('change', applyFilters);
-  },
-  
-  // فتح نموذج إضافة منتج
-  openAddProductModal: (storeId) => {
-    const modal = document.getElementById('global-modal');
-    const body = document.getElementById('modal-body');
-    if (!modal || !body) return;
-    
-    body.innerHTML = `
-      <h3 style="text-align:center; margin-bottom:20px;">➕ إضافة منتج جديد</h3>
-      <form id="add-product-form" style="text-align:right;">
-        <div class="form-group">
-          <label>اسم المنتج *</label>
-          <input type="text" id="prod-name" class="input-field" required>
-        </div>
-        <div class="form-group">
-          <label>الوصف</label>
-          <textarea id="prod-desc" class="input-field" rows="3"></textarea>
-        </div>
-        <div class="form-group">
-          <label>السعر (د.ع) *</label>
-          <input type="number" id="prod-price" class="input-field" min="0" required>
-        </div>
-        <div class="form-group">
-          <label>صورة المنتج</label>
-          <input type="file" id="prod-image" class="input-field" accept="image/*">
-        </div>
-        <div class="form-group">
-          <label>
-            <input type="checkbox" id="prod-available" checked> متاح للبيع
-          </label>
-        </div>
-      </form>
-      <div style="display:flex; gap:10px; margin-top:20px;">
-        <button onclick="Admin.saveProduct('${storeId}')" class="btn btn-primary" style="flex:1;">💾 حفظ المنتج</button>
-        <button onclick="document.getElementById('global-modal')?.classList.add('hidden')" class="btn btn-outline" style="flex:1;">إلغاء</button>
-      </div>
-    `;
-    modal.classList.remove('hidden');
-  },
-  
-  // حفظ منتج جديد
-  saveProduct: async (storeId) => {
-    const name = document.getElementById('prod-name')?.value.trim();
-    const description = document.getElementById('prod-desc')?.value.trim();
-    const price = parseFloat(document.getElementById('prod-price')?.value);
-    const isAvailable = document.getElementById('prod-available')?.checked;
-    const imageFile = document.getElementById('prod-image')?.files[0];
-    
-    if (!name || !price) return alert('⚠️ يرجى إدخال اسم المنتج والسعر');
-    
-    let imageUrl = null;
-    if (imageFile) {
-      try {
-        const compressed = await Utils.compressImage(imageFile, 800, 0.8);
-        const fileName = `products/${storeId}/${Date.now()}_${name.replace(/\s+/g, '_')}.jpg`;
-        const { error: upErr,  upData } = await App.db.storage
-          .from(CONFIG.STORAGE_BUCKETS.products)
-          .upload(fileName, compressed, { upsert: true });
-        if (!upErr && upData?.path) {
-          imageUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl;
-        }
-      } catch (e) {
-        console.warn('⚠️ فشل رفع الصورة:', e);
-      }
-    }
-    
-    const { error } = await App.db.from('products').insert({
-      store_id: storeId,
-      name,
-      description,
-      price,
-      image_url: imageUrl,
-      is_available: isAvailable
-    });
-    
-    if (error) return alert('❌ فشل حفظ المنتج: ' + error.message);
-    
-    document.getElementById('global-modal')?.classList.add('hidden');
-    alert('✅ تم إضافة المنتج بنجاح');
-    const storeName = document.getElementById('store-name')?.innerText.replace('🏪 ', '');
-    Admin.viewStoreProducts(storeId, storeName);
-  },
-  
-  // تبديل حالة المنتج (متوفر/منتهي)
-  toggleProductAvailability: async (productId, currentStatus) => {
-    const { error } = await App.db
-      .from('products')
-      .update({ is_available: !currentStatus })
-      .eq('id', productId);
-    
-    if (error) return alert('❌ فشل تحديث الحالة: ' + error.message);
-    
-    // إعادة تحميل القائمة
-    const cards = document.querySelectorAll('#products-list .card');
-    if (cards[0]) {
-      const storeId = cards[0].dataset.storeId;
-      const storeName = document.getElementById('store-name')?.innerText.replace('🏪 ', '');
-      if (storeId) Admin.viewStoreProducts(storeId, storeName);
-    }
-  },
-  
-  // حذف منتج
-  deleteProduct: async (productId) => {
-    if (!confirm('⚠️ هل أنت متأكد من حذف هذا المنتج نهائياً؟')) return;
-    
-    const { error } = await App.db.from('products').delete().eq('id', productId);
-    if (error) return alert('❌ فشل حذف المنتج: ' + error.message);
-    
-    alert('✅ تم حذف المنتج');
-    // إعادة تحميل القائمة
-    const cards = document.querySelectorAll('#products-list .card');
-    if (cards[0]) {
-      const storeId = cards[0].dataset.storeId;
-      const storeName = document.getElementById('store-name')?.innerText.replace('🏪 ', '');
-      if (storeId) Admin.viewStoreProducts(storeId, storeName);
-    }
-  },
-  
-  // تبديل حالة المتجر
-  toggleStoreStatus: async (storeId, currentStatus) => {
-    const newStatus = currentStatus === 'مفتوح' ? 'مغلق' : 'مفتوح';
-    const { error } = await App.db
-      .from('profiles')
-      .update({ store_status: newStatus })
-      .eq('id', storeId);
-    
-    if (error) return alert('❌ فشل تحديث حالة المتجر: ' + error.message);
-    
-    alert(`✅ تم ${newStatus === 'مفتوح' ? 'تفعيل' : 'إغلاق'} المتجر`);
-    Admin.fetchStores();
-  }
-};
-
-// ==========================================
 // 🚀 التهيئة النهائية
 // ==========================================
 if (document.readyState === 'loading') {
@@ -1926,31 +1639,9 @@ if (document.readyState === 'loading') {
     App.init();
     // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
     if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
-    
-    // ✅ تحميل قائمة المتاجر إذا كنا في صفحة الإدارة
-    if (App.currentRoute === 'admin-stores') {
-      setTimeout(() => Admin.fetchStores(), 100);
-    }
-    if (App.currentRoute === 'admin-store-products') {
-      setTimeout(() => {
-        const storeId = App.router.payload; // قد تحتاج لتعديل هذا حسب طريقة تمرير المعرف
-        if (storeId) Admin.viewStoreProducts(storeId, '');
-      }, 100);
-    }
   });
 } else {
   App.init();
   // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
   if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
-  
-  // ✅ تحميل قائمة المتاجر إذا كنا في صفحة الإدارة
-  if (App.currentRoute === 'admin-stores') {
-    setTimeout(() => Admin.fetchStores(), 100);
-  }
-  if (App.currentRoute === 'admin-store-products') {
-    setTimeout(() => {
-      const storeId = App.router.payload;
-      if (storeId) Admin.viewStoreProducts(storeId, '');
-    }, 100);
-  }
 }
