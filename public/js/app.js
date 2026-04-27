@@ -879,7 +879,7 @@ const Auth = {
       }
     }
     
-    // ✅ التصحيح الرئيسي: إضافة 'data:' قبل authData
+    // ✅ التصحيح الرئيسي: إضافة '' قبل authData و options.data
     const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
@@ -905,7 +905,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة '' قبل upData
+          // ✅ التصحيح: إضافة 'data:' قبل upData
           const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
@@ -933,7 +933,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          // ✅ التصحيح: إضافة '' قبل upData
+          // ✅ التصحيح: إضافة 'data:' قبل upData
           const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
@@ -963,7 +963,7 @@ const Auth = {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
           // ✅ التصحيح: إضافة '' قبل upData
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -1230,8 +1230,8 @@ const Rating = {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    // ✅ التصحيح: إضافة 'data:' قبل existing
-    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    // ✅ التصحيح: إضافة '' قبل existing
+    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
