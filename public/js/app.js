@@ -1478,10 +1478,170 @@ window.confirm = (message) => {
 };
 
 // ==========================================
+// 🔔 Notifications Module - إشعارات صوتية ومرئية (يستخدم نغمة النظام تلقائياً في الخلفية)
+// ==========================================
+const Notifications = {
+  audioCtx: null,
+  toastContainer: null,
+  enabled: true,
+  
+  init: () => {
+    // ✅ تهيئة سياق الصوت البرمجي
+    try {
+      Notifications.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) { console.warn('🔇 Web Audio غير مدعوم'); }
+    
+    // ✅ إنشاء حاوية الإشعارات المرئية
+    if (!document.getElementById('toast-container')) {
+      Notifications.toastContainer = document.createElement('div');
+      Notifications.toastContainer.id = 'toast-container';
+      Notifications.toastContainer.style.cssText = `
+        position: fixed; top: 80px; right: 20px; z-index: 10001;
+        display: flex; flex-direction: column; gap: 10px;
+        max-width: 320px; pointer-events: none;
+      `;
+      document.body.appendChild(Notifications.toastContainer);
+    } else {
+      Notifications.toastContainer = document.getElementById('toast-container');
+    }
+    
+    // ✅ تحميل التفضيل
+    const saved = localStorage.getItem('notifications_enabled');
+    if (saved !== null) Notifications.enabled = saved === 'true';
+    
+    // ✅ طلب إذن الإشعارات
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  },
+  
+  // ✅ توليد نغمة إشعار قياسية برمجياً (تحاكي صوت النظام)
+  playTone: () => {
+    if (!Notifications.enabled || !Notifications.audioCtx) return;
+    try {
+      if (Notifications.audioCtx.state === 'suspended') Notifications.audioCtx.resume();
+      const osc = Notifications.audioCtx.createOscillator();
+      const gain = Notifications.audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(Notifications.audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, Notifications.audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1100, Notifications.audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.4, Notifications.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, Notifications.audioCtx.currentTime + 0.25);
+      osc.start();
+      osc.stop(Notifications.audioCtx.currentTime + 0.25);
+    } catch (e) {}
+  },
+  
+  // ✅ عرض الإشعار الكامل (صوتي + مرئي + نظام)
+  show: (title, message, type = 'info', onClick = null) => {
+    if (!Notifications.enabled) return;
+    Notifications.playTone(); // 🔊 نغمة برمجية عند فتح التطبيق
+    Notifications.showToast(title, message, type, onClick);
+    
+    // 📱 إشعار الخلفية (يستخدم نغمة الهاتف الافتراضية تلقائياً)
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body: message,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `shira-${Date.now()}`,
+        requireInteraction: true
+      });
+    }
+  },
+  
+  showToast: (title, message, type, onClick) => {
+    const colors = {
+      info: { bg: '#3b82f6', icon: '🔔' }, success: { bg: '#22c55e', icon: '✅' },
+      warning: { bg: '#f59e0b', icon: '⚠️' }, error: { bg: '#ef4444', icon: '❌' },
+      trip: { bg: '#8b5cf6', icon: '🚗' }, order: { bg: '#ec4899', icon: '📦' }
+    };
+    const style = colors[type] || colors.info;
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.style.cssText = `
+      background: white; border-radius: 12px; padding: 15px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2); border-right: 4px solid ${style.bg};
+      display: flex; align-items: flex-start; gap: 12px;
+      animation: slideIn 0.3s ease; pointer-events: auto;
+      cursor: ${onClick ? 'pointer' : 'default'};
+    `;
+    toast.innerHTML = `
+      <div style="font-size: 24px; flex-shrink: 0;">${style.icon}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">${title}</div>
+        <div style="font-size: 14px; color: #64748b; line-height: 1.4;">${message}</div>
+      </div>
+      <button onclick="this.closest('.notification-toast').remove()" style="
+        background: none; border: none; font-size: 20px; color: #94a3b8;
+        cursor: pointer; padding: 0; width: 24px; height: 24px;
+        display: flex; align-items: center; justify-content: center;
+      ">&times;</button>
+    `;
+    if (onClick) {
+      toast.onclick = (e) => { if (!e.target.closest('button')) { toast.remove(); onClick(); } };
+    }
+    Notifications.toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 8000);
+  },
+  
+  toggle: () => {
+    Notifications.enabled = !Notifications.enabled;
+    localStorage.setItem('notifications_enabled', Notifications.enabled);
+    return Notifications.enabled;
+  },
+  
+  subscribeToUpdates: () => {
+    if (!App.user?.id) return;
+    
+    // 🔔 مراقبة الرسائل الجديدة
+    App.db.channel('messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${App.user.id}` }, 
+        (payload) => { if (payload.new.sender_id !== App.user.id) Notifications.show('💬 رسالة جديدة', 'لديك رسالة جديدة من الإدارة', 'info', () => App.router('profile')); })
+      .subscribe();
+      
+    // 🔔 مراقبة الطلبات الجديدة (للسائقين)
+    if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(App.profile?.role)) {
+      App.db.channel('trips')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trips', filter: `status=eq.قيد الانتظار` },
+          () => Notifications.show('🚀 طلب جديد!', 'اضغط لعرض تفاصيل الطلب', 'trip', () => App.router('dashboard')))
+        .subscribe();
+    }
+    
+    // 🔔 مراقبة طلبات المتاجر (لأصحاب المتاجر)
+    if (App.profile?.role === 'صاحب متجر') {
+      App.db.channel('orders')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${App.user.id}` },
+          () => Notifications.show('📦 طلب جديد في متجرك!', 'اضغط لمراجعة الطلب', 'order', () => App.router('dashboard')))
+        .subscribe();
+    }
+  }
+};
+
+// ✅ أنيميشن الإشعارات
+if (!document.getElementById('notif-anim-style')) {
+  const s = document.createElement('style');
+  s.id = 'notif-anim-style';
+  s.textContent = `@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100px);opacity:0}}`;
+  document.head.appendChild(s);
+}
+
+// ==========================================
 // 🚀 التهيئة النهائية
 // ==========================================
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => App.init());
+  document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+    // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
+    if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
+  });
 } else {
   App.init();
+  // ✅ تفعيل الإشعارات بعد تهيئة التطبيق
+  if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
 }
