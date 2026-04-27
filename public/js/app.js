@@ -1,6 +1,6 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v4.1
-// ✅ التحديث: واجهات مخصصة + استقبال تلقائي للسائقين + تحكم يدوي للمتاجر
+// شراع | Shira Platform - Core Application Engine v4.1.1
+// ✅ التصحيح العاجل: إصلاح أخطاء Destructuring في التسجيل ورفع الصور
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
 
@@ -819,7 +819,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module
+// 🔐 Auth Module (✅ تم التصحيح هنا)
 // ==========================================
 const Auth = {
   login: async () => {
@@ -842,6 +842,7 @@ const Auth = {
     if (res.error) return alert('❌ ' + res.error.message);
     location.reload();
   },
+  
   register: async (role) => {
     const name = document.getElementById('reg-name')?.value.trim();
     const phone = document.getElementById('reg-phone')?.value.trim();
@@ -864,7 +865,8 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr,  upData } = await App.db.storage
+        // ✅ التصحيح: إضافة 'data:' قبل upData
+        const { error: upErr, data: upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
@@ -876,15 +878,20 @@ const Auth = {
         console.warn('⚠️ فشل رفع الصورة الشخصية:', e);
       }
     }
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    
+    // ✅ التصحيح الرئيسي: إضافة 'data:' قبل authData
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {  { name, phone, role, gender, age: parseInt(age) } }
+      options: { data: { name, phone, role, gender, age: parseInt(age) } }
     });
+    
     if (authErr) return alert('❌ ' + authErr.message);
     if (!authData?.user) return alert('❌ فشل إنشاء الحساب، حاول مرة أخرى');
+    
     const userId = authData.user.id;
     let roleData = {};
+    
     if (role === 'سائق تكسي' || role === 'سائق توك توك') {
       const plate = document.getElementById('reg-plate')?.value.trim();
       const carType = document.getElementById('reg-car-type')?.value.trim();
@@ -898,6 +905,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
+          // ✅ التصحيح: إضافة 'data:' قبل upData
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
@@ -925,6 +933,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
+          // ✅ التصحيح: إضافة 'data:' قبل upData
           const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.products)
             .upload(fileName, compressed, { upsert: true });
@@ -953,7 +962,8 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
+          // ✅ التصحيح: إضافة 'data:' قبل upData
+          const { error: upErr, data: upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -970,6 +980,7 @@ const Auth = {
         vehicle_images: bikePhotoUrls
       };
     }
+    
     const profileData = {
       id: userId,
       name,
@@ -981,6 +992,7 @@ const Auth = {
       profile_image: photoUrl,
       ...roleData
     };
+    
     const { error: profErr } = await App.db.from('profiles').insert(profileData);
     if (profErr) return alert('❌ خطأ في حفظ البيانات: ' + profErr.message);
 
@@ -1218,7 +1230,8 @@ const Rating = {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    // ✅ التصحيح: إضافة 'data:' قبل existing
+    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
@@ -1328,7 +1341,7 @@ const AboutShira = {
         <h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
         <p style="color:var(--text-muted); margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
         <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:20px; text-align:right;">
-          <p><strong>📱 الإصدار:</strong> 4.1.0</p>
+          <p><strong>📱 الإصدار:</strong> 4.1.1</p>
           <p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
           <p><strong>📍 المقر:</strong> بغداد، العراق</p>
           <p><strong>📧 الدعم:</strong> support@shira.app</p>
