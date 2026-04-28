@@ -444,7 +444,7 @@ const Views = {
   // ✅ مكتمل: إدارة المنتجات (لصاحب المتجر)
   storeProducts: async () => {
     if (!App.user?.id) return Views.dashboard();
-    const {  products } = await App.db.from('products').select('*').eq('store_id', App.user.id).order('created_at',{ascending:false});
+    const { data: products } = await App.db.from('products').select('*').eq('store_id', App.user.id).order('created_at',{ascending:false});
     
     return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
       <h2>📦 منتجاتي</h2>
@@ -647,17 +647,18 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
+        const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
           photoUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).getPublicUrl(upData.path).data.publicUrl;
         }
       } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ تم إصلاح الخطأ النحوي هنا:
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {  { name, phone, role, gender, age: parseInt(age) } }
+      options: { data: { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -678,7 +679,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             carPhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -695,7 +696,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             storePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -714,7 +715,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             bikePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -950,7 +951,7 @@ const Store = {
       if (file) {
         const compressed = await Utils.compressImage(file, 800, 0.85);
         const fileName = `products/${App.user.id}/${Date.now()}.jpg`;
-        const {  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+        const { data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
         if (upData?.path) imageUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl;
       }
       
@@ -1012,7 +1013,7 @@ const Shopping = {
     if (!App.userLocation) { await App.checkGPS(); }
     
     // ✅ جلب جميع المتاجر النشطة (بدون فلترة store_status)
-    const {  stores, error } = await App.db.from('profiles')
+    const { data: stores, error } = await App.db.from('profiles')
       .select('id,name,profile_image,store_type,store_status,avg_rating')
       .eq('role', 'صاحب متجر')
       .eq('status', 'نشط');
@@ -1062,7 +1063,7 @@ const Shopping = {
   // فتح المتجر وعرض منتجاته (جميعها ظاهرة)
   openStore: async (storeId, storeName) => {
     // جلب جميع المنتجات (بدون فلترة الحالة)
-    const {  products } = await App.db.from('products')
+    const { data: products } = await App.db.from('products')
       .select('*')
       .eq('store_id', storeId);
 
@@ -1199,7 +1200,7 @@ const Shopping = {
       const store = grouped[sid];
       
       // إنشاء الطلب الرئيسي
-      const {  orderData, error } = await App.db.from('orders').insert({
+      const { data: orderData, error } = await App.db.from('orders').insert({
         store_id: sid,
         customer_id: App.user.id,
         total_price: store.total,
