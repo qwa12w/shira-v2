@@ -2,6 +2,7 @@
 // شراع | Shira Platform - Core Application Engine v4.1.1
 // ✅ التصحيح العاجل: إصلاح أخطاء Destructuring في التسجيل ورفع الصور
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
+// ✅ إصلاح مهم: معالجة الصفحات غير المتزامنة (async) في الـ router
 // ==========================================
 
 const App = {
@@ -267,6 +268,27 @@ const App = {
       container.innerHTML = App.routes[route](payload);
       Utils.hideSkeleton('#app-view');
     } else {
+      // ✅ معالجة خاصة للصفحات غير المتزامنة (async)
+      if (route === 'shopping') {
+        Views.shopping().then(html => {
+          container.innerHTML = html;
+          if (headerTitle) headerTitle.innerText = 'التسوق';
+          Utils.hideSkeleton('#app-view');
+        });
+        App.currentRoute = route;
+        return;
+      }
+      if (route === 'store-products') {
+        Views.storeProducts(payload).then(html => {
+          container.innerHTML = html;
+          if (headerTitle) headerTitle.innerText = 'إدارة المنتجات';
+          Utils.hideSkeleton('#app-view');
+        });
+        App.currentRoute = route;
+        return;
+      }
+      
+      // الصفحات العادية (متزامنة)
       switch (route) {
         case 'role-select': container.innerHTML = Views.roleSelect(); if (headerTitle) headerTitle.innerText = 'اختر القسم'; break;
         case 'login': container.innerHTML = Views.login(); if (headerTitle) headerTitle.innerText = 'تسجيل الدخول'; break;
@@ -274,10 +296,8 @@ const App = {
         case 'home': container.innerHTML = Views.home(); if (headerTitle) headerTitle.innerText = 'الرئيسية'; break;
         case 'dashboard': container.innerHTML = Views.dashboard(); if (headerTitle) headerTitle.innerText = 'لوحة التحكم'; break;
         case 'request-ride': container.innerHTML = Views.requestRide(payload); if (headerTitle) headerTitle.innerText = 'طلب رحلة'; break;
-        case 'shopping': container.innerHTML = Views.shopping(); if (headerTitle) headerTitle.innerText = 'التسوق'; break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
         case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
-        case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
         case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
