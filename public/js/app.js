@@ -1,8 +1,7 @@
 // ==========================================
 // شراع | Shira Platform - Core Application Engine v4.1.1
-// ✅ التصحيح العاجل: إصلاح أخطاء Destructuring في التسجيل ورفع الصور
+// ✅ نسخة جاهزة للإنتاج - جميع التعاملات نقدية (كاش)
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
-// ✅ إصلاح مهم: معالجة الصفحات غير المتزامنة (async) في الـ router
 // ==========================================
 
 const App = {
@@ -18,7 +17,6 @@ const App = {
   userLocation: null,
   destLocation: null,
   subscriptionTimer: null,
-  cart: [],
 
   init: async () => {
     try {
@@ -33,53 +31,6 @@ const App = {
       Utils.hideSkeleton('#app-view');
       alert('حدث خطأ أثناء تحميل التطبيق. يرجى تحديث الصفحة.');
     }
-  },
-
-  ensureDb: () => {
-    if (!App.db) {
-      App.db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
-    }
-  },
-
-  filterStores: () => {
-    const search = document.getElementById('store-search')?.value.toLowerCase() || '';
-    const type = document.getElementById('store-type-filter')?.value || '';
-    document.querySelectorAll('.store-card').forEach(card => {
-      const name = card.dataset.name || '';
-      const cardType = card.dataset.type || '';
-      card.style.display = (name.includes(search) && (!type || cardType === type)) ? '' : 'none';
-    });
-  },
-
-  addToCart: (productId, productName, price) => {
-    const existing = App.cart.find(item => item.id === productId);
-    if (existing) existing.qty++;
-    else App.cart.push({ id: productId, name: productName, price, qty: 1 });
-    const countEl = document.getElementById('cart-count');
-    if (countEl) countEl.innerText = App.cart.reduce((sum, i) => sum + i.qty, 0);
-  },
-
-  showCart: () => {
-    if (App.cart.length === 0) return alert('🛒 السلة فارغة');
-    const total = App.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
-    const itemsHtml = App.cart.map(i => `
-      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f5f9;">
-        <span>${i.name} × ${i.qty}</span>
-        <strong>${(i.price * i.qty).toLocaleString()} د.ع</strong>
-      </div>`).join('');
-    showCustomAlert('🛒 سلة المشتريات', `${itemsHtml}<div style="margin-top:15px; font-weight:700;">المجموع: ${total.toLocaleString()} د.ع</div>`, 
-      () => { alert('✅ سيتم تطوير إتمام الطلب قريباً'); App.cart = []; if(document.getElementById('cart-count')) document.getElementById('cart-count').innerText = '0'; });
-  },
-
-  toggleProductAvailability: async (productId, currentStatus, storeId) => {
-    if (App.profile?.role !== 'صاحب متجر') return alert('⛔ صلاحية صاحب المتجر فقط');
-    const newStatus = currentStatus === 'متوفر' ? 'منتهي' : 'متوفر';
-    try {
-      App.ensureDb();
-      await App.db.from('products').update({ availability: newStatus }).eq('id', productId);
-      alert(`✅ تم: ${newStatus}`);
-      App.router('store-products', storeId);
-    } catch (err) { alert('❌ فشل: ' + err.message); }
   },
 
   checkGPS: async () => {
@@ -105,7 +56,7 @@ const App = {
     try {
       Utils.showSkeleton('#app-view');
       const sessionRes = await App.db.auth.getSession();
-      const session = sessionRes.data ? sessionRes.data.session : null;
+      const session = sessionRes.data?.session || null;
       
       if (!session) {
         Utils.hideSkeleton('#app-view');
@@ -252,8 +203,6 @@ const App = {
     if (gate) gate.classList.add('hidden');
     if (appContainer) appContainer.classList.remove('hidden');
     
-    const isAuth = ['login', 'register', 'role-select'].includes(route);
-    
     if (backBtn) {
       backBtn.classList.toggle('hidden', ['home', 'dashboard', 'login'].includes(route));
       backBtn.onclick = () => {
@@ -268,27 +217,6 @@ const App = {
       container.innerHTML = App.routes[route](payload);
       Utils.hideSkeleton('#app-view');
     } else {
-      // ✅ معالجة خاصة للصفحات غير المتزامنة (async)
-      if (route === 'shopping') {
-        Views.shopping().then(html => {
-          container.innerHTML = html;
-          if (headerTitle) headerTitle.innerText = 'التسوق';
-          Utils.hideSkeleton('#app-view');
-        });
-        App.currentRoute = route;
-        return;
-      }
-      if (route === 'store-products') {
-        Views.storeProducts(payload).then(html => {
-          container.innerHTML = html;
-          if (headerTitle) headerTitle.innerText = 'إدارة المنتجات';
-          Utils.hideSkeleton('#app-view');
-        });
-        App.currentRoute = route;
-        return;
-      }
-      
-      // الصفحات العادية (متزامنة)
       switch (route) {
         case 'role-select': container.innerHTML = Views.roleSelect(); if (headerTitle) headerTitle.innerText = 'اختر القسم'; break;
         case 'login': container.innerHTML = Views.login(); if (headerTitle) headerTitle.innerText = 'تسجيل الدخول'; break;
@@ -296,8 +224,10 @@ const App = {
         case 'home': container.innerHTML = Views.home(); if (headerTitle) headerTitle.innerText = 'الرئيسية'; break;
         case 'dashboard': container.innerHTML = Views.dashboard(); if (headerTitle) headerTitle.innerText = 'لوحة التحكم'; break;
         case 'request-ride': container.innerHTML = Views.requestRide(payload); if (headerTitle) headerTitle.innerText = 'طلب رحلة'; break;
+        case 'shopping': container.innerHTML = Views.shopping(); if (headerTitle) headerTitle.innerText = 'التسوق'; break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
         case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
+        case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
         case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
@@ -381,7 +311,7 @@ const App = {
 };
 
 // ==========================================
-// 🎨 Views Module - واجهات مخصصة لكل دور
+// 🎨 Views Module
 // ==========================================
 const Views = {
   roleSelect: () => {
@@ -404,551 +334,229 @@ const Views = {
   
   register: (role) => {
     const commonFields = `
-      <div class="form-group">
-        <label>📸 صورة الملف الشخصي</label>
-        <input type="file" id="reg-photo" accept="image/*" class="input-field">
-      </div>
-      <div class="form-group">
-        <label>الاسم الكامل *</label>
-        <input type="text" id="reg-name" class="input-field" placeholder="أدخل اسمك الكامل" required>
-      </div>
-      <div class="form-group">
-        <label>رقم الجوال *</label>
-        <input type="tel" id="reg-phone" class="input-field" placeholder="07xxxxxxxxx" pattern="07[0-9]{9}" required>
-      </div>
-      <div class="form-group">
-        <label>الجنس *</label>
-        <select id="reg-gender" class="input-field" required>
-          <option value="">اختر الجنس</option>
-          <option value="ذكر">ذكر</option>
-          <option value="أنثى">أنثى</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>السن *</label>
-        <input type="number" id="reg-age" class="input-field" placeholder="مثال: 25" min="18" max="80" required>
-      </div>
-      <div class="form-group">
-        <label>كلمة المرور *</label>
-        <input type="password" id="reg-pass" class="input-field" minlength="6" required>
-      </div>
-      <div class="form-group">
-        <label>تأكيد كلمة المرور *</label>
-        <input type="password" id="reg-pass-confirm" class="input-field" minlength="6" required>
-      </div>
+      <div class="form-group"><label>📸 صورة الملف الشخصي</label><input type="file" id="reg-photo" accept="image/*" class="input-field"></div>
+      <div class="form-group"><label>الاسم الكامل *</label><input type="text" id="reg-name" class="input-field" placeholder="أدخل اسمك الكامل" required></div>
+      <div class="form-group"><label>رقم الجوال *</label><input type="tel" id="reg-phone" class="input-field" placeholder="07xxxxxxxxx" pattern="07[0-9]{9}" required></div>
+      <div class="form-group"><label>الجنس *</label><select id="reg-gender" class="input-field" required><option value="">اختر الجنس</option><option value="ذكر">ذكر</option><option value="أنثى">أنثى</option></select></div>
+      <div class="form-group"><label>السن *</label><input type="number" id="reg-age" class="input-field" placeholder="مثال: 25" min="18" max="80" required></div>
+      <div class="form-group"><label>كلمة المرور *</label><input type="password" id="reg-pass" class="input-field" minlength="6" required></div>
+      <div class="form-group"><label>تأكيد كلمة المرور *</label><input type="password" id="reg-pass-confirm" class="input-field" minlength="6" required></div>
     `;
 
     const roleFields = {
       'زبون': '',
-      'سائق تكسي': `
-        <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--primary);">🚗 بيانات السيارة</h4>
-        <div class="form-group">
-          <label>رقم السيارة (اللوحة) *</label>
-          <input type="text" id="reg-plate" class="input-field" placeholder="مثال: ب غ د 123" required>
-        </div>
-        <div class="form-group">
-          <label>نوع السيارة *</label>
-          <input type="text" id="reg-car-type" class="input-field" placeholder="مثال: كيا أوبتيما 2020" required>
-        </div>
-        <div class="form-group">
-          <label>لون السيارة *</label>
-          <input type="text" id="reg-car-color" class="input-field" placeholder="مثال: أبيض" required>
-        </div>
-        <div class="form-group">
-          <label>صور السيارة (من عدة زوايا) *</label>
-          <input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
-        </div>
-      `,
-      'سائق توك توك': `
-        <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--primary);">🛺 بيانات التوك توك</h4>
-        <div class="form-group">
-          <label>رقم التوك توك *</label>
-          <input type="text" id="reg-plate" class="input-field" placeholder="رقم المركبة" required>
-        </div>
-        <div class="form-group">
-          <label>نوع التوك توك *</label>
-          <input type="text" id="reg-car-type" class="input-field" placeholder="مثال: باجاج/أوروبي/صيني" required>
-        </div>
-        <div class="form-group">
-          <label>لون التوك توك *</label>
-          <input type="text" id="reg-car-color" class="input-field" placeholder="مثال: أصفر" required>
-        </div>
-        <div class="form-group">
-          <label>صور التوك توك *</label>
-          <input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
-        </div>
-      `,
-      'صاحب متجر': `
-        <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--primary);">🏪 بيانات المتجر</h4>
-        <div class="form-group">
-          <label>نوع المتجر *</label>
-          <select id="reg-store-type" class="input-field" required>
-            <option value="">اختر نوع المتجر</option>
-            <option value="مطعم">🍽️ مطعم</option>
-            <option value="صيدلية">💊 صيدلية</option>
-            <option value="أسواق">🛒 أسواق</option>
-            <option value="أسماك">🐟 أسماك</option>
-            <option value="دجاج">🍗 دجاج</option>
-            <option value="قصابة">🥩 قصابة</option>
-            <option value="مخضر">🥬 مخضر</option>
-            <option value="موبايلات">📱 موبايلات</option>
-            <option value="كهربائيات">💡 كهربائيات</option>
-            <option value="أسماك الزينة">🐠 أسماك الزينة</option>
-            <option value="طيور وحيوانات">🐦 طيور وحيوانات</option>
-            <option value="بيطرة">🐕 بيطرة</option>
-            <option value="عطور">🌸 عطور</option>
-            <option value="عطارية">🌿 عطارية</option>
-            <option value="أخرى">📦 أخرى</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>صور المتجر (الواجهة والداخل) *</label>
-          <input type="file" id="reg-store-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
-        </div>
-      `,
-      'دلفري': `
-        <hr style="margin: 20px 0; border: 0; border-top: 2px dashed #cbd5e1;">
-        <h4 style="margin-bottom: 15px; color: var(--primary);">🏍️ بيانات الدراجة</h4>
-        <div class="form-group">
-          <label>نوع الدراجة *</label>
-          <input type="text" id="reg-bike-type" class="input-field" placeholder="مثال: هوندا 150" required>
-        </div>
-        <div class="form-group">
-          <label>رقم الدراجة (اختياري)</label>
-          <input type="text" id="reg-bike-plate" class="input-field" placeholder="إذا كانت مسجلة">
-        </div>
-        <div class="form-group">
-          <label>حالة الدراجة *</label>
-          <select id="reg-bike-status" class="input-field" required>
-            <option value="">اختر الحالة</option>
-            <option value="مسجلة">✅ مسجلة رسمياً</option>
-            <option value="غير مسجلة">⚠️ غير مسجلة</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>صور الدراجة *</label>
-          <input type="file" id="reg-bike-photos" accept="image/*" multiple class="input-field" required>
-          <small style="color: var(--green); display: block; margin-top: 5px;">اختر 3-5 صور كحد أقصى</small>
-        </div>
-      `
+      'سائق تكسي': `<hr style="margin:20px 0;border:0;border-top:2px dashed #cbd5e1;"><h4 style="margin-bottom:15px;color:var(--primary);">🚗 بيانات السيارة</h4>
+        <div class="form-group"><label>رقم السيارة (اللوحة) *</label><input type="text" id="reg-plate" class="input-field" placeholder="مثال: ب غ د 123" required></div>
+        <div class="form-group"><label>نوع السيارة *</label><input type="text" id="reg-car-type" class="input-field" placeholder="مثال: كيا أوبتيما 2020" required></div>
+        <div class="form-group"><label>لون السيارة *</label><input type="text" id="reg-car-color" class="input-field" placeholder="مثال: أبيض" required></div>
+        <div class="form-group"><label>صور السيارة *</label><input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required><small style="color:var(--green);display:block;margin-top:5px;">اختر 3-5 صور كحد أقصى</small></div>`,
+      'سائق توك توك': `<hr style="margin:20px 0;border:0;border-top:2px dashed #cbd5e1;"><h4 style="margin-bottom:15px;color:var(--primary);">🛺 بيانات التوك توك</h4>
+        <div class="form-group"><label>رقم التوك توك *</label><input type="text" id="reg-plate" class="input-field" placeholder="رقم المركبة" required></div>
+        <div class="form-group"><label>نوع التوك توك *</label><input type="text" id="reg-car-type" class="input-field" placeholder="مثال: باجاج/أوروبي/صيني" required></div>
+        <div class="form-group"><label>لون التوك توك *</label><input type="text" id="reg-car-color" class="input-field" placeholder="مثال: أصفر" required></div>
+        <div class="form-group"><label>صور التوك توك *</label><input type="file" id="reg-car-photos" accept="image/*" multiple class="input-field" required><small style="color:var(--green);display:block;margin-top:5px;">اختر 3-5 صور كحد أقصى</small></div>`,
+      'صاحب متجر': `<hr style="margin:20px 0;border:0;border-top:2px dashed #cbd5e1;"><h4 style="margin-bottom:15px;color:var(--primary);">🏪 بيانات المتجر</h4>
+        <div class="form-group"><label>نوع المتجر *</label><select id="reg-store-type" class="input-field" required><option value="">اختر نوع المتجر</option><option value="مطعم">🍽️ مطعم</option><option value="صيدلية">💊 صيدلية</option><option value="أسواق">🛒 أسواق</option><option value="أسماك">🐟 أسماك</option><option value="دجاج">🍗 دجاج</option><option value="قصابة">🥩 قصابة</option><option value="مخضر">🥬 مخضر</option><option value="موبايلات">📱 موبايلات</option><option value="كهربائيات">💡 كهربائيات</option><option value="أخرى">📦 أخرى</option></select></div>
+        <div class="form-group"><label>صور المتجر *</label><input type="file" id="reg-store-photos" accept="image/*" multiple class="input-field" required><small style="color:var(--green);display:block;margin-top:5px;">اختر 3-5 صور كحد أقصى</small></div>`,
+      'دلفري': `<hr style="margin:20px 0;border:0;border-top:2px dashed #cbd5e1;"><h4 style="margin-bottom:15px;color:var(--primary);">🏍️ بيانات الدراجة</h4>
+        <div class="form-group"><label>نوع الدراجة *</label><input type="text" id="reg-bike-type" class="input-field" placeholder="مثال: هوندا 150" required></div>
+        <div class="form-group"><label>رقم الدراجة (اختياري)</label><input type="text" id="reg-bike-plate" class="input-field" placeholder="إذا كانت مسجلة"></div>
+        <div class="form-group"><label>حالة الدراجة *</label><select id="reg-bike-status" class="input-field" required><option value="">اختر الحالة</option><option value="مسجلة">✅ مسجلة رسمياً</option><option value="غير مسجلة">⚠️ غير مسجلة</option></select></div>
+        <div class="form-group"><label>صور الدراجة *</label><input type="file" id="reg-bike-photos" accept="image/*" multiple class="input-field" required><small style="color:var(--green);display:block;margin-top:5px;">اختر 3-5 صور كحد أقصى</small></div>`
     };
 
     const extraFields = roleFields[role] || '';
-    
-    return `
-      <form id="reg-form" style="text-align: right;">
-        ${commonFields}
-        ${extraFields}
-      </form>
+    return `<form id="reg-form" style="text-align:right;">${commonFields}${extraFields}</form>
       <button onclick="Auth.register('${role}')" class="btn btn-primary mt-2">✅ إنشاء الحساب</button>
-      <button onclick="App.router('login')" class="btn btn-outline">⬅️ رجوع لتسجيل الدخول</button>
-    `;
+      <button onclick="App.router('login')" class="btn btn-outline">⬅️ رجوع لتسجيل الدخول</button>`;
   },
   
   home: () => {
     if (!App.profile) return '<div class="text-center mt-2">جاري التحميل...</div>';
-    
     const role = App.profile.role;
-    
     if (role === 'زبون') {
       return `<div class="card" onclick="App.router('request-ride', 'تاكسي')"><div class="icon">🚗</div><h3>طلب تاكسي</h3></div>` +
         `<div class="card" onclick="App.router('request-ride', 'توك توك')"><div class="icon">🛺</div><h3>طلب توك توك</h3></div>` +
         `<div class="card" onclick="App.router('shopping')"><div class="icon">🛒</div><h3>تسوق</h3></div>` +
         `<div class="card" onclick="App.router('my-orders')"><div class="icon">📦</div><h3>طلباتي</h3></div>`;
     }
-    
     return Views.dashboard();
   },
   
-  shopping: async () => {
-    try {
-      App.ensureDb();
-      const {  stores } = await App.db.from('profiles')
-        .select('id, name, profile_image, store_type, description, store_status')
-        .eq('role', 'صاحب متجر').eq('status', 'نشط');
-      const storesList = stores || [];
-      const types = [...new Set(storesList.map(s => s.store_type).filter(Boolean))];
-      return `
-        <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
-          <input type="text" id="store-search" placeholder="🔍 ابحث باسم المتجر..." 
-                 style="flex:1; min-width:200px; padding:10px; border:1px solid #ddd; border-radius:10px;"
-                 oninput="App.filterStores()">
-          <select id="store-type-filter" style="padding:10px; border:1px solid #ddd; border-radius:10px;" onchange="App.filterStores()">
-            <option value="">كل الأنواع</option>
-            ${types.map(t => `<option value="${t}">${t}</option>`).join('')}
-          </select>
-        </div>
-        <div id="stores-container" style="display:grid; gap:12px;">
-          ${storesList.map(store => `
-            <div class="store-card" data-name="${(store.name||'').toLowerCase()}" data-type="${store.store_type||''}" 
-                 style="background:white; border-radius:12px; padding:15px; display:flex; gap:12px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.05);"
-                 onclick="App.router('store-products', '${store.id}')">
-              <img src="${store.profile_image || 'https://ui-avatars.com/api/?name='+encodeURIComponent(store.name)}" 
-                   style="width:60px; height:60px; border-radius:10px; object-fit:cover;">
-              <div style="flex:1;">
-                <div style="display:flex; justify-content:space-between; align-items:start;">
-                  <h4 style="margin:0; font-size:15px;">${store.name}</h4>
-                  <span style="background:${store.store_status==='مفتوح'?'#22c55e':'#ef4444'}; color:white; padding:3px 10px; border-radius:20px; font-size:11px;">
-                    ${store.store_status==='مفتوح'?'🟢 مفتوح':'🔴 مغلق'}
-                  </span>
-                </div>
-                <p style="margin:5px 0 0; color:#64748b; font-size:12px;">${store.store_type||''}</p>
-                ${store.description ? `<p style="margin:5px 0 0; color:#94a3b8; font-size:11px;">${store.description.substring(0,50)}...</p>` : ''}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        ${storesList.length === 0 ? '<p style="text-align:center; color:#64748b; padding:30px;">لا توجد متاجر حالياً</p>' : ''}
-      `;
-    } catch (err) {
-      console.error('Stores load error:', err);
-      return '<div class="text-center mt-2" style="color:var(--red)">❌ فشل تحميل المتاجر</div>';
-    }
+  shopping: () => {
+    return `<div class="text-center" style="padding:40px 20px;">
+      <div style="font-size:60px;margin-bottom:20px;">🛒</div>
+      <h2 style="margin-bottom:15px;">قسم التسوق</h2>
+      <p style="color:var(--text-muted);margin-bottom:30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
+      <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
   },
   
   dashboard: () => {
-    if (!App.profile) {
-      setTimeout(() => App.router('login'), 100);
-      return '<div class="text-center mt-2">جاري التحميل...</div>';
-    }
-    
+    if (!App.profile) { setTimeout(() => App.router('login'), 100); return '<div class="text-center mt-2">جاري التحميل...</div>'; }
     const name = App.profile.name || 'مستخدم';
     const role = App.profile.role || '';
     const subscriptionEnds = App.profile.subscription_ends_at;
     
     if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(role)) {
       const earnings = App.profile.earnings_today || 0;
-      
-      if (subscriptionEnds) {
-        setTimeout(() => App.startSubscriptionTimer(subscriptionEnds), 100);
-      }
-      
-      return `
-        <div class="card glass-panel">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3>👋 ${name}</h3>
-            <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span>
-          </div>
-          
-          <div class="form-group" style="background:#dcfce7; padding:12px; border-radius:12px; margin-bottom:15px; border:2px solid #22c55e;">
-            <label style="font-weight:600; color:#166534;">🟢 أنت نشط حالياً</label>
-            <p style="font-size:13px; color:#166534; margin:5px 0 0;">
-              ستستلم طلبات جديدة بشكل مستمر حتى انتهاء اشتراكك
-            </p>
-          </div>
-          
-          ${subscriptionEnds ? `
-          <div class="form-group" style="background:#fff3cd; padding:12px; border-radius:12px; margin-bottom:15px;">
-            <label style="font-weight:600;">⏰ الوقت المتبقي للاشتراك:</label>
-            <div id="subscription-timer" style="font-size:1.2rem; font-weight:bold; margin-top:5px;">جاري الحساب...</div>
-            <small style="color:var(--text-muted);">بعد الانتهاء سيتوقف استلام الطلبات تلقائياً</small>
-          </div>` : ''}
-          
-          <div class="card" style="margin-bottom:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span>💰 أرباح اليوم</span>
-              <strong style="font-size:1.3rem; color:var(--primary);">${earnings.toLocaleString()} د.ع</strong>
-            </div>
+      if (subscriptionEnds) setTimeout(() => App.startSubscriptionTimer(subscriptionEnds), 100);
+      return `<div class="card glass-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h3>👋 ${name}</h3><span class="badge" style="background:var(--accent);color:white;padding:4px 10px;border-radius:20px;font-size:12px;">${role}</span>
+        </div>
+        <div class="form-group" style="background:#dcfce7;padding:12px;border-radius:12px;margin-bottom:15px;border:2px solid #22c55e;">
+          <label style="font-weight:600;color:#166534;">🟢 أنت نشط حالياً</label>
+          <p style="font-size:13px;color:#166534;margin:5px 0 0;">ستستلم طلبات جديدة بشكل مستمر حتى انتهاء اشتراكك</p>
+        </div>
+        ${subscriptionEnds ? `<div class="form-group" style="background:#fff3cd;padding:12px;border-radius:12px;margin-bottom:15px;">
+          <label style="font-weight:600;">⏰ الوقت المتبقي للاشتراك:</label>
+          <div id="subscription-timer" style="font-size:1.2rem;font-weight:bold;margin-top:5px;">جاري الحساب...</div>
+          <small style="color:var(--text-muted);">بعد الانتهاء سيتوقف استلام الطلبات تلقائياً</small>
+        </div>` : ''}
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>💰 أرباح اليوم</span><strong style="font-size:1.3rem;color:var(--primary);">${earnings.toLocaleString()} د.ع</strong>
           </div>
         </div>
-        
-        ${role === 'دلفري' ? `
-        <div class="card" onclick="App.router('delivery-map')">
-          <div class="icon">🔥</div>
-          <h3>خريطة المناطق الساخنة</h3>
-          <p style="color:var(--text-muted); font-size:13px;">🔴 عالية الطلب • 🟢 منخفضة الطلب</p>
-        </div>` : `
-        <div class="card" onclick="Driver.fetchNearbyTrips()">
-          <div class="icon">📍</div>
-          <h3>الرحلات القريبة</h3>
-          <p style="color:var(--text-muted); font-size:13px;">اضغط لعرض الطلبات القريبة منك</p>
-        </div>`}
-        
-        <div class="card" onclick="App.router('profile')">
-          <div class="icon">📊</div>
-          <h3>إحصائياتي</h3>
-        </div>
-        <div class="card" onclick="App.router('my-orders')">
-          <div class="icon">📋</div>
-          <h3>سجل الرحلات</h3>
-        </div>
-      `;
+      </div>
+      ${role === 'دلفري' ? `<div class="card" onclick="App.router('delivery-map')"><div class="icon">🔥</div><h3>خريطة المناطق الساخنة</h3><p style="color:var(--text-muted);font-size:13px;">🔴 عالية الطلب • 🟢 منخفضة الطلب</p></div>` : `<div class="card" onclick="Driver.fetchNearbyTrips()"><div class="icon">📍</div><h3>الرحلات القريبة</h3><p style="color:var(--text-muted);font-size:13px;">اضغط لعرض الطلبات القريبة منك</p></div>`}
+      <div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>إحصائياتي</h3></div>
+      <div class="card" onclick="App.router('my-orders')"><div class="icon">📋</div><h3>سجل الرحلات</h3></div>`;
     }
     
     if (role === 'صاحب متجر') {
       const salesToday = App.profile.sales_today || 0;
       const storeStatus = App.profile.store_status || 'مغلق';
-      
-      return `
-        <div class="card glass-panel">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3>👋 ${name}</h3>
-            <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span>
+      return `<div class="card glass-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+          <h3>👋 ${name}</h3><span class="badge" style="background:var(--accent);color:white;padding:4px 10px;border-radius:20px;font-size:12px;">${role}</span>
+        </div>
+        <div class="form-group" style="background:#f8fafc;padding:12px;border-radius:12px;margin-bottom:15px;">
+          <label style="font-weight:600;">🏪 حالة المتجر:</label>
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button onclick="Store.toggleStatus('مفتوح')" class="btn ${storeStatus === 'مفتوح' ? 'btn-primary' : 'btn-outline'}" style="flex:1;padding:10px;">🟢 مفتوح</button>
+            <button onclick="Store.toggleStatus('مغلق')" class="btn ${storeStatus === 'مغلق' ? 'btn-danger' : 'btn-outline'}" style="flex:1;padding:10px;">🔴 مغلق</button>
           </div>
-          
-          <div class="form-group" style="background:#f8fafc; padding:12px; border-radius:12px; margin-bottom:15px;">
-            <label style="font-weight:600;">🏪 حالة المتجر:</label>
-            <div style="display:flex; gap:10px; margin-top:8px;">
-              <button onclick="Store.toggleStatus('مفتوح')" class="btn ${storeStatus === 'مفتوح' ? 'btn-primary' : 'btn-outline'}" style="flex:1; padding:10px;">🟢 مفتوح</button>
-              <button onclick="Store.toggleStatus('مغلق')" class="btn ${storeStatus === 'مغلق' ? 'btn-danger' : 'btn-outline'}" style="flex:1; padding:10px;">🔴 مغلق</button>
-            </div>
-            <p style="font-size:13px; color:var(--text-muted); margin-top:8px;">
-              ${storeStatus === 'مفتوح' ? 'متجرك يستقبل طلبات جديدة الآن' : 'متجرك لا يستقبل طلبات جديدة حالياً'}
-            </p>
-          </div>
-          
-          <div class="card" style="margin-bottom:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span>📊 مبيعات اليوم</span>
-              <strong style="font-size:1.3rem; color:var(--primary);">${salesToday.toLocaleString()} د.ع</strong>
-            </div>
+          <p style="font-size:13px;color:var(--text-muted);margin-top:8px;">${storeStatus === 'مفتوح' ? 'متجرك يستقبل طلبات جديدة الآن' : 'متجرك لا يستقبل طلبات جديدة حالياً'}</p>
+        </div>
+        <div class="card" style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>📊 مبيعات اليوم</span><strong style="font-size:1.3rem;color:var(--primary);">${salesToday.toLocaleString()} د.ع</strong>
           </div>
         </div>
-        
-        <div class="card" onclick="App.router('store-products')">
-          <div class="icon">📦</div>
-          <h3>إدارة المنتجات</h3>
-          <p style="color:var(--text-muted); font-size:13px;">إضافة/تعديل/حذف المنتجات</p>
-        </div>
-        <div class="card" onclick="Store.fetchNewOrders()">
-          <div class="icon">🔔</div>
-          <h3>الطلبات الجديدة</h3>
-          <p style="color:var(--text-muted); font-size:13px;">استقبال ومتابعة الطلبات</p>
-        </div>
-        <div class="card" onclick="Store.trackDeliveries()">
-          <div class="icon">🚚</div>
-          <h3>متابعة التوصيل</h3>
-          <p style="color:var(--text-muted); font-size:13px;">حالة طلبات التوصيل</p>
-        </div>
-        <div class="card" onclick="App.router('profile')">
-          <div class="icon">📈</div>
-          <h3>الإحصائيات</h3>
-        </div>
-      `;
+      </div>
+      <div class="card" onclick="App.router('store-products')"><div class="icon">📦</div><h3>إدارة المنتجات</h3><p style="color:var(--text-muted);font-size:13px;">إضافة/تعديل/حذف المنتجات</p></div>
+      <div class="card" onclick="Store.fetchNewOrders()"><div class="icon">🔔</div><h3>الطلبات الجديدة</h3><p style="color:var(--text-muted);font-size:13px;">استقبال ومتابعة الطلبات</p></div>
+      <div class="card" onclick="Store.trackDeliveries()"><div class="icon">🚚</div><h3>متابعة التوصيل</h3><p style="color:var(--text-muted);font-size:13px;">حالة طلبات التوصيل</p></div>
+      <div class="card" onclick="App.router('profile')"><div class="icon">📈</div><h3>الإحصائيات</h3></div>`;
     }
     
     if (role === 'admin') {
-      return `
-        <div class="card glass-panel">
-          <h3>👋 لوحة تحكم المدير</h3>
-          <p style="color:var(--text-muted);">إدارة شاملة للتطبيق</p>
-        </div>
+      return `<div class="card glass-panel"><h3>👋 لوحة تحكم المدير</h3><p style="color:var(--text-muted);">إدارة شاملة للتطبيق</p></div>
         <div class="card"><div class="icon">👥</div><h3>المستخدمين</h3></div>
         <div class="card"><div class="icon">🚗</div><h3>السائقين</h3></div>
         <div class="card"><div class="icon">🏪</div><h3>المتاجر</h3></div>
         <div class="card"><div class="icon">📈</div><h3>الإحصائيات</h3></div>
-        <div class="card"><div class="icon">⚙️</div><h3>الإعدادات</h3></div>
-      `;
+        <div class="card"><div class="icon">⚙️</div><h3>الإعدادات</h3></div>`;
     }
     
-    return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">${role}</span></p></div>` +
-      `<div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
+    return `<div class="card"><h3>👋 ${name}</h3><p>الدور: <span class="badge" style="background:var(--accent);color:white;padding:4px 10px;border-radius:20px;font-size:12px;">${role}</span></p></div>
+      <div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
   
-  myOrders: () => {
-    return `<div class="text-center" style="padding:40px 20px;">
-      <div style="font-size:60px; margin-bottom:20px;">📦</div>
-      <h2>طلباتي</h2>
-      <p style="color:var(--text-muted); margin-bottom:30px;">سجل جميع طلباتك السابقة والحالية</p>
-      <button onclick="App.router('home')" class="btn btn-outline">العودة</button>
-    </div>`;
-  },
+  myOrders: () => `<div class="text-center" style="padding:40px 20px;">
+    <div style="font-size:60px;margin-bottom:20px;">📦</div><h2>طلباتي</h2>
+    <p style="color:var(--text-muted);margin-bottom:30px;">سجل جميع طلباتك السابقة والحالية</p>
+    <button onclick="App.router('home')" class="btn btn-outline">العودة</button></div>`,
   
-  storeProducts: async (storeId) => {
-    try {
-      App.ensureDb();
-      const {  store } = await App.db.from('profiles').select('name, store_status').eq('id', storeId).single();
-      const {  products } = await App.db.from('products').select('*').eq('store_id', storeId).order('created_at', { ascending: false });
-      const isClosed = store?.store_status !== 'مفتوح';
-      const isOwner = App.profile?.id === storeId;
-      return `
-        ${isClosed && !isOwner ? `<div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:10px; margin-bottom:15px; text-align:center;">🔴 هذا المتجر مغلق حالياً</div>` : ''}
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-          <h3 style="margin:0;">📦 منتجات ${store?.name || ''}</h3>
-          ${!isOwner ? `<button onclick="App.showCart()" style="padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:10px; cursor:pointer;">🛒 <span id="cart-count">0</span></button>` : ''}
-        </div>
-        <div id="products-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px;">
-          ${(products || []).map(p => `
-            <div style="background:#f8fafc; border-radius:12px; padding:12px; text-align:center; ${p.availability==='منتهي'?'opacity:0.6':''}">
-              <img src="${p.image_url || 'https://via.placeholder.com/150?text=No+Image'}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px;">
-              <h4 style="margin:0 0 5px; font-size:14px;">${p.name}</h4>
-              <p style="margin:0 0 8px; color:var(--primary); font-weight:600;">${p.price?.toLocaleString() || 0} د.ع</p>
-              ${isOwner ? `
-                <button onclick="App.toggleProductAvailability('${p.id}', '${p.availability||'متوفر'}', '${storeId}')" 
-                        style="padding:6px 12px; background:${p.availability==='متوفر'?'#22c55e':'#ef4444'}; color:white; border:none; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">
-                  ${p.availability==='متوفر'?'✅ متوفر':'📭 منتهي'}
-                </button>` :
-                (p.availability !== 'منتهي' ? `<button onclick="App.addToCart('${p.id}', '${p.name}', ${p.price})" ${isClosed?'disabled':''} style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">${isClosed?'المحل مغلق':'➕ أضف'}</button>` : `<span style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:20px; font-size:11px;">📭 منتهي</span>`)
-              }
-            </div>
-          `).join('')}
-        </div>
-        ${(!products || products.length === 0) ? '<p style="text-align:center; color:#64748b; padding:30px;">لا توجد منتجات</p>' : ''}
-      `;
-    } catch (err) {
-      console.error('Products load error:', err);
-      return '<div class="text-center mt-2" style="color:var(--red)">❌ فشل التحميل</div>';
-    }
-  },
-  
-  deliveryMap: () => {
-    return `<div class="map-wrapper" style="height:400px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
-      <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:15px;">
-        <h4 style="margin-bottom:10px;">🔥 خريطة المناطق الساخنة</h4>
-        <div style="display:flex; gap:10px; font-size:13px;">
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:#ef4444; border-radius:50%;"></span> طلبات كثيرة</span>
-          <span style="display:flex; align-items:center; gap:5px;"><span style="width:12px; height:12px; background:#22c55e; border-radius:50%;"></span> طلبات قليلة</span>
-        </div>
+  storeProducts: () => `<div class="text-center" style="padding:40px 20px;">
+    <div style="font-size:60px;margin-bottom:20px;">📦</div><h2>إدارة المنتجات</h2>
+    <p style="color:var(--text-muted);margin-bottom:30px;">إضافة، تعديل، وحذف المنتجات</p>
+    <button class="btn btn-primary" style="margin-bottom:20px;">➕ إضافة منتج جديد</button>
+    <div class="card" style="margin-bottom:10px;text-align:right;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><strong>منتج مثال</strong><p style="color:var(--text-muted);font-size:13px;margin:5px 0;">السعر: 5,000 د.ع</p></div>
+        <span class="badge" style="background:var(--green);color:white;padding:4px 10px;border-radius:20px;font-size:12px;">✅ متوفر</span>
       </div>
-      <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>`;
-  },
+    </div>
+    <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button></div>`,
+  
+  deliveryMap: () => `<div class="map-wrapper" style="height:400px;border-radius:12px;overflow:hidden;margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
+    <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:15px;">
+      <h4 style="margin-bottom:10px;">🔥 خريطة المناطق الساخنة</h4>
+      <div style="display:flex;gap:10px;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#ef4444;border-radius:50%;"></span> طلبات كثيرة</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#22c55e;border-radius:50%;"></span> طلبات قليلة</span>
+      </div>
+    </div>
+    <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>`,
   
   requestRide: (type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
-    return `<div class="map-wrapper" style="height:300px; border-radius:12px; overflow:hidden; margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>` +
-      `<div style="background: #fff3cd; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; text-align: center;">📍 اضغط على الخريطة لتحديد وجهتك</div>` +
-      `<div class="form-group"><label>الوجهة المحددة</label><input type="text" id="ride-dest" class="input-field" placeholder="اضغط على الخريطة أو اكتب العنوان" readonly></div>` +
-      `<div class="form-group"><label>نوع المركبة</label><input type="text" value="${type}" class="input-field" readonly></div>` +
-      `<div class="card" style="display:flex; justify-content:space-between; align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--primary); font-size:20px;"><span id="price-val">${basePrice}</span> د.ع</strong></div>` +
-      `<button onclick="Trips.request('${type}')" class="btn btn-primary">🚀 تأكيد الرحلة</button>`;
+    return `<div class="map-wrapper" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
+      <div style="background:#fff3cd;padding:10px;border-radius:8px;margin-bottom:15px;font-size:13px;text-align:center;">📍 اضغط على الخريطة لتحديد وجهتك</div>
+      <div class="form-group"><label>الوجهة المحددة</label><input type="text" id="ride-dest" class="input-field" placeholder="اضغط على الخريطة أو اكتب العنوان" readonly></div>
+      <div class="form-group"><label>نوع المركبة</label><input type="text" value="${type}" class="input-field" readonly></div>
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;"><span>💰 السعر التقديري:</span><strong style="color:var(--primary);font-size:20px;"><span id="price-val">${basePrice}</span> د.ع</strong></div>
+      <div class="form-group" style="background:#dbeafe;padding:10px;border-radius:8px;margin:10px 0;">
+        <label style="font-weight:600;">💵 طريقة الدفع:</label>
+        <p style="font-size:13px;color:#1e40af;margin:5px 0 0;">✅ الدفع نقداً عند الوصول (كاش)</p>
+      </div>
+      <button onclick="Trips.request('${type}')" class="btn btn-primary">🚀 تأكيد الرحلة - دفع كاش</button>`;
   },
   
   profile: () => {
-    if (!App.profile) {
-      setTimeout(() => App.router('login'), 100);
-      return '<div class="text-center mt-2">جاري التحميل...</div>';
-    }
-    
+    if (!App.profile) { setTimeout(() => App.router('login'), 100); return '<div class="text-center mt-2">جاري التحميل...</div>'; }
     const name = App.profile.name || 'مستخدم';
     const phone = App.profile.phone || '';
     const role = App.profile.role || '';
     const profileImage = App.profile.profile_image;
     const avgRating = App.profile.avg_rating || 0;
     const ratingCount = App.profile.rating_count || 0;
-    
     const avatarUrl = profileImage ? profileImage : 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&background=f59e0b&color=fff&size=200';
     const fallbackSvg = 'image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y1OWUwYiIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPvCfkqQ8L3RleHQ+PC9zdmc+';
     
-    const supportSection = `
-      <div class="card glass-panel" style="margin-top:20px;">
-        <h4 style="margin-bottom:15px; display:flex; align-items:center; gap:8px;">
-          <i class="fas fa-headset"></i> الدعم والمساعدة
-        </h4>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="padding:10px; font-size:13px;">
-            <i class="fab fa-whatsapp"></i> واتساب
-          </button>
-          <button onclick="Messages.openChatModal()" class="btn btn-secondary" style="padding:10px; font-size:13px;">
-            <i class="fas fa-comment"></i> مراسلة
-          </button>
-        </div>
-        <button onclick="AboutShira.showModal()" class="btn btn-outline mt-2" style="padding:10px; font-size:13px;">
-          <i class="fas fa-info-circle"></i> عن شراع
-        </button>
+    const supportSection = `<div class="card glass-panel" style="margin-top:20px;">
+      <h4 style="margin-bottom:15px;display:flex;align-items:center;gap:8px;"><i class="fas fa-headset"></i> الدعم والمساعدة</h4>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="padding:10px;font-size:13px;"><i class="fab fa-whatsapp"></i> واتساب</button>
+        <button onclick="Messages.openChatModal()" class="btn btn-secondary" style="padding:10px;font-size:13px;"><i class="fas fa-comment"></i> مراسلة</button>
       </div>
-    `;
+      <button onclick="AboutShira.showModal()" class="btn btn-outline mt-2" style="padding:10px;font-size:13px;"><i class="fas fa-info-circle"></i> عن شراع</button>
+    </div>`;
     
     const ratingSection = (role !== 'زبون' && role !== 'admin' && role !== 'owner') ? `
       <div class="card glass-panel" style="text-align:center;">
         <h4 style="margin-bottom:10px;">⭐ تقييمك العام</h4>
-        <div class="rating-stars" style="font-size:1.5rem; margin:10px 0;">
-          ${Rating.renderStars(avgRating)}
-        </div>
-        <p style="color:var(--text-muted); font-size:13px;">
-          ${avgRating.toFixed(1)} من 5 • ${ratingCount} تقييم
-        </p>
-      </div>
-    ` : '';
+        <div class="rating-stars" style="font-size:1.5rem;margin:10px 0;">${Rating.renderStars(avgRating)}</div>
+        <p style="color:var(--text-muted);font-size:13px;">${avgRating.toFixed(1)} من 5 • ${ratingCount} تقييم</p>
+      </div>` : '';
     
-    const bottomNavInProfile = `
-      <div class="profile-bottom-nav" style="
-        position: fixed; bottom: 0; left: 0; right: 0;
-        background: linear-gradient(to bottom, rgba(255,255,255,0.98), rgba(255,255,255,0.95));
-        backdrop-filter: blur(10px);
-        padding: 10px 5px;
-        display: flex; justify-content: space-around; align-items: center;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        z-index: 999; border-top: 1px solid #f1f5f9;
-      ">
-        <button onclick="App.router('home')" style="
-          flex: 1; text-align: center; padding: 8px 5px;
-          background: none; border: none; cursor: pointer;
-          font-size: 0.75rem; display: flex;
-          flex-direction: column; align-items: center; gap: 4px;
-          color: #64748b; transition: all 0.2s;
-        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
-          <span style="font-size: 1.3rem;">🏠</span>
-          <span>الرئيسية</span>
-        </button>
-        <button onclick="App.router('my-orders')" style="
-          flex: 1; text-align: center; padding: 8px 5px;
-          background: none; border: none; cursor: pointer;
-          font-size: 0.75rem; display: flex;
-          flex-direction: column; align-items: center; gap: 4px;
-          color: #64748b; transition: all 0.2s;
-        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
-          <span style="font-size: 1.3rem;">📦</span>
-          <span>طلباتي</span>
-        </button>
-        <button onclick="App.router('chat')" style="
-          flex: 1; text-align: center; padding: 8px 5px;
-          background: none; border: none; cursor: pointer;
-          font-size: 0.75rem; display: flex;
-          flex-direction: column; align-items: center; gap: 4px;
-          color: #64748b; transition: all 0.2s;
-        " onmouseover="this.style.color='#f59e0b'" onmouseout="this.style.color='#64748b'">
-          <span style="font-size: 1.3rem;">💬</span>
-          <span>الرسائل</span>
-        </button>
-        <button onclick="App.router('profile')" style="
-          flex: 1; text-align: center; padding: 8px 5px;
-          background: rgba(245, 158, 11, 0.1);
-          border: none; cursor: pointer;
-          font-size: 0.75rem; display: flex;
-          flex-direction: column; align-items: center; gap: 4px;
-          color: #f59e0b; border-radius: 12px;
-        ">
-          <span style="font-size: 1.3rem;">👤</span>
-          <span>الملف</span>
-        </button>
-      </div>
-    `;
-    
-    return `
-      <div class="text-center mb-2" style="padding-top: 20px;">
-        <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
-        <h2 class="mt-2">${name}</h2>
-        <p style="color:var(--text-muted);">${phone}</p>
-        <p style="color: var(--primary); font-size: 14px; margin-top: 5px; font-weight:600;">${role}</p>
-      </div>
-      ${ratingSection}
-      <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
-      <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
-      ${supportSection}
-      ${bottomNavInProfile}
-    `;
+    return `<div class="text-center mb-2" style="padding-top:20px;">
+      <img src="${avatarUrl}" style="width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)" onerror="this.src='${fallbackSvg}'">
+      <h2 class="mt-2">${name}</h2><p style="color:var(--text-muted);">${phone}</p>
+      <p style="color:var(--primary);font-size:14px;margin-top:5px;font-weight:600;">${role}</p>
+    </div>${ratingSection}
+    <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
+    <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
+    ${supportSection}`;
   }
 };
 
 // ==========================================
-// 🔐 Auth Module (✅ تم التصحيح الكامل هنا)
+// 🔐 Auth Module (✅ مصحح بالكامل)
 // ==========================================
 const Auth = {
   login: async () => {
     const phoneInput = document.getElementById('login-phone');
     const passInput = document.getElementById('login-pass');
-    const phone = phoneInput ? phoneInput.value.trim() : '';
-    const pass = passInput ? passInput.value : '';
+    const phone = phoneInput?.value.trim() || '';
+    const pass = passInput?.value || '';
     if (!phone || !pass) return alert('⚠️ أكمل البيانات');
+    
     try {
       const checkRes = await App.db.from('profiles').select('pending_deletion_at').eq('phone', phone).single();
-      if (checkRes.data && checkRes.data.pending_deletion_at) {
+      if (checkRes.data?.pending_deletion_at) {
         const delDate = new Date(checkRes.data.pending_deletion_at);
         if (new Date() < delDate) {
           const days = Math.ceil((delDate - new Date()) / (1000 * 60 * 60 * 24));
@@ -956,6 +564,7 @@ const Auth = {
         }
       }
     } catch (e) { console.warn('Profile check skipped:', e); }
+    
     const res = await App.db.auth.signInWithPassword({ email: phone + '@shira.app', password: pass });
     if (res.error) return alert('❌ ' + res.error.message);
     location.reload();
@@ -968,46 +577,30 @@ const Auth = {
     const passConf = document.getElementById('reg-pass-confirm')?.value;
     const gender = document.getElementById('reg-gender')?.value;
     const age = document.getElementById('reg-age')?.value;
-    if (!name || !phone || !pass || !gender || !age) {
-      return alert('⚠️ يرجى إكمال جميع الحقول المطلوبة (*)');
-    }
-    if (pass !== passConf) {
-      return alert('⚠️ كلمات المرور غير متطابقة');
-    }
-    if (!/^07[0-9]{9}$/.test(phone)) {
-      return alert('⚠️ رقم الجوال غير صحيح (يجب أن يبدأ بـ 07 ويتكون من 10 أرقام)');
-    }
+    
+    if (!name || !phone || !pass || !gender || !age) return alert('⚠️ يرجى إكمال جميع الحقول المطلوبة (*)');
+    if (pass !== passConf) return alert('⚠️ كلمات المرور غير متطابقة');
+    if (!/^07[0-9]{9}$/.test(phone)) return alert('⚠️ رقم الجوال غير صحيح (يجب أن يبدأ بـ 07 ويتكون من 10 أرقام)');
+    
     let photoUrl = null;
     const photoFile = document.getElementById('reg-photo')?.files[0];
     if (photoFile) {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr,  upData } = await App.db.storage
-          .from(CONFIG.STORAGE_BUCKETS.avatars)
-          .upload(fileName, compressed, { upsert: true });
+        const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
-          photoUrl = App.db.storage
-            .from(CONFIG.STORAGE_BUCKETS.avatars)
-            .getPublicUrl(upData.path).data.publicUrl;
+          photoUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).getPublicUrl(upData.path).data.publicUrl;
         }
-      } catch (e) {
-        console.warn('⚠️ فشل رفع الصورة الشخصية:', e);
-      }
+      } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    // ✅ التصحيح الرئيسي: signUp مع options.data
-    const {  authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ التصحيح: signUp مع options.data
+    const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
       options: {
-        data: { 
-          name: name,
-          phone: phone,
-          role: role,
-          gender: gender,
-          age: parseInt(age)
-        }
+        data: { name, phone, role, gender, age: parseInt(age) }
       }
     });
     
@@ -1022,97 +615,62 @@ const Auth = {
       const carType = document.getElementById('reg-car-type')?.value.trim();
       const carColor = document.getElementById('reg-car-color')?.value.trim();
       const carPhotos = document.getElementById('reg-car-photos')?.files;
-      if (!plate || !carType || !carColor || !carPhotos?.length) {
-        return alert('⚠️ يرجى إكمال بيانات المركبة ورفع الصور');
-      }
+      if (!plate || !carType || !carColor || !carPhotos?.length) return alert('⚠️ يرجى إكمال بيانات المركبة ورفع الصور');
+      
       let carPhotoUrls = [];
       for (let i = 0; i < Math.min(carPhotos.length, 5); i++) {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
-            .from(CONFIG.STORAGE_BUCKETS.vehicles)
-            .upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
-            carPhotoUrls.push(
-              App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl
-            );
+            carPhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
         } catch (e) { console.warn('Image upload skipped:', e); }
       }
-      roleData = {
-        plate_number: plate,
-        vehicle_type: carType,
-        vehicle_color: carColor,
-        vehicle_images: carPhotoUrls
-      };
+      roleData = { plate_number: plate, vehicle_type: carType, vehicle_color: carColor, vehicle_images: carPhotoUrls };
     } else if (role === 'صاحب متجر') {
       const storeType = document.getElementById('reg-store-type')?.value;
       const storePhotos = document.getElementById('reg-store-photos')?.files;
-      if (!storeType || !storePhotos?.length) {
-        return alert('⚠️ يرجى اختيار نوع المتجر ورفع الصور');
-      }
+      if (!storeType || !storePhotos?.length) return alert('⚠️ يرجى اختيار نوع المتجر ورفع الصور');
+      
       let storePhotoUrls = [];
       for (let i = 0; i < Math.min(storePhotos.length, 5); i++) {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
-            .from(CONFIG.STORAGE_BUCKETS.products)
-            .upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
-            storePhotoUrls.push(
-              App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl
-            );
+            storePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl);
           }
         } catch (e) { console.warn('Store image upload skipped:', e); }
       }
-      roleData = {
-        store_type: storeType,
-        store_images: storePhotoUrls,
-        store_status: 'مغلق'
-      };
+      roleData = { store_type: storeType, store_images: storePhotoUrls, store_status: 'مغلق' };
     } else if (role === 'دلفري') {
       const bikeType = document.getElementById('reg-bike-type')?.value.trim();
       const bikePlate = document.getElementById('reg-bike-plate')?.value.trim() || null;
       const bikeStatus = document.getElementById('reg-bike-status')?.value;
       const bikePhotos = document.getElementById('reg-bike-photos')?.files;
-      if (!bikeType || !bikeStatus || !bikePhotos?.length) {
-        return alert('⚠️ يرجى إكمال بيانات الدراجة ورفع الصور');
-      }
+      if (!bikeType || !bikeStatus || !bikePhotos?.length) return alert('⚠️ يرجى إكمال بيانات الدراجة ورفع الصور');
+      
       let bikePhotoUrls = [];
       for (let i = 0; i < Math.min(bikePhotos.length, 5); i++) {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr,  upData } = await App.db.storage
-            .from(CONFIG.STORAGE_BUCKETS.vehicles)
-            .upload(fileName, compressed, { upsert: true });
+          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
-            bikePhotoUrls.push(
-              App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl
-            );
+            bikePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
         } catch (e) { console.warn('Bike image upload skipped:', e); }
       }
-      roleData = {
-        vehicle_type: bikeType,
-        plate_number: bikePlate,
-        bike_status: bikeStatus,
-        vehicle_images: bikePhotoUrls
-      };
+      roleData = { vehicle_type: bikeType, plate_number: bikePlate, bike_status: bikeStatus, vehicle_images: bikePhotoUrls };
     }
     
     const profileData = {
-      id: userId,
-      name,
-      phone,
-      role,
-      gender,
-      age: parseInt(age),
+      id: userId, name, phone, role, gender, age: parseInt(age),
       status: role === 'زبون' ? 'نشط' : 'قيد المراجعة',
-      profile_image: photoUrl,
-      ...roleData
+      profile_image: photoUrl, ...roleData
     };
     
     const { error: profErr } = await App.db.from('profiles').insert(profileData);
@@ -1121,7 +679,6 @@ const Auth = {
     const title = role === 'زبون' ? '✅ تم إنشاء حسابك!' : '✅ تم تسجيل طلبك!';
     const message = role === 'زبون' ? 'جاري الدخول...' : 'سيراجعه فريق الإدارة خلال 24 ساعة.';
     const onConfirm = role === 'زبون' ? () => location.reload() : () => App.router('login');
-    
     showCustomAlert(title, message, onConfirm);
   }
 };
@@ -1147,11 +704,10 @@ const MapUtils = {
       }, (err) => console.warn('⚠️ تعذر الحصول على الموقع:', err));
     }
     App.map.on('click', (e) => {
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
+      const lat = e.latlng.lat, lng = e.latlng.lng;
       if (App.destMarker) App.map.removeLayer(App.destMarker);
       App.destMarker = L.marker([lat, lng]).addTo(App.map).bindPopup('🎯 وجهتك').openPopup();
-      App.destLocation = { lat: lat, lng: lng };
+      App.destLocation = { lat, lng };
       const destInput = document.getElementById('ride-dest');
       if (destInput) destInput.value = 'إحداثيات: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
       if (App.userLocation && serviceType) {
@@ -1167,75 +723,80 @@ const MapUtils = {
     if (App.map) { App.map.remove(); App.map = null; }
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
-    
     App.map = L.map('map').setView(App.userLocation || CONFIG.MAP_CENTER, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(App.map);
-    
-    const heatData = [
-      [33.3152, 44.3661, 0.9],
-      [33.3200, 44.3700, 0.7],
-      [33.3100, 44.3600, 0.8],
-      [33.2800, 44.3200, 0.3],
-      [33.2900, 44.3300, 0.2],
-      [33.3400, 44.3900, 0.6],
-    ];
-    
-    heatData.forEach(([lat, lng, intensity]) => {
+    const heatData = [[33.3152,44.3661,0.9],[33.32,44.37,0.7],[33.31,44.36,0.8],[33.28,44.32,0.3],[33.29,44.33,0.2],[33.34,44.39,0.6]];
+    heatData.forEach(([lat,lng,intensity]) => {
       const color = intensity > 0.7 ? '#ef4444' : intensity > 0.4 ? '#f59e0b' : '#22c55e';
-      const radius = intensity * 300;
-      L.circle([lat, lng], {
-        color: color,
-        fillColor: color,
-        fillOpacity: 0.3,
-        radius: radius
-      }).addTo(App.map).bindPopup(`كثافة الطلب: ${Math.round(intensity * 100)}%`);
+      L.circle([lat,lng], { color, fillColor: color, fillOpacity: 0.3, radius: intensity*300 }).addTo(App.map).bindPopup(`كثافة الطلب: ${Math.round(intensity*100)}%`);
     });
-    
-    if (App.userLocation) {
-      App.userMarker = L.marker([App.userLocation.lat, App.userLocation.lng]).addTo(App.map).bindPopup('📍 موقعك').openPopup();
-    }
+    if (App.userLocation) App.userMarker = L.marker([App.userLocation.lat, App.userLocation.lng]).addTo(App.map).bindPopup('📍 موقعك').openPopup();
   },
   
-  calculateDistance: (lat1, lon1, lat2, lon2) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+  calculateDistance: (lat1,lon1,lat2,lon2) => {
+    const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+    const a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
   },
   
-  calculatePrice: (distance, type) => {
-    const basePrice = (type === 'تاكسي') ? 3000 : 2000;
-    const pricePerKm = (type === 'تاكسي') ? 1000 / 3 : 750 / 3;
-    let price = (distance <= 3) ? basePrice : basePrice + (distance - 3) * pricePerKm;
-    return Math.ceil(price / 250) * 250;
+  calculatePrice: (distance,type) => {
+    const basePrice = type==='تاكسي'?3000:2000, pricePerKm = type==='تاكسي'?1000/3:750/3;
+    let price = distance<=3?basePrice:basePrice+(distance-3)*pricePerKm;
+    return Math.ceil(price/250)*250;
   }
 };
 
 // ==========================================
-// 📦 Trips Module
+// 📦 Trips Module - نظام الرحلات (دفع كاش فقط)
 // ==========================================
 const Trips = {
   request: async (type) => {
     const destInput = document.getElementById('ride-dest');
-    const dest = destInput ? destInput.value : '';
+    const dest = destInput?.value || '';
     if (!dest) return alert('⚠️ يرجى تحديد الوجهة بالضغط على الخريطة');
     const priceEl = document.getElementById('price-val');
-    const finalPrice = priceEl ? parseInt(priceEl.innerText) : ((type === 'تاكسي') ? 3000 : 2000);
+    const finalPrice = priceEl ? parseInt(priceEl.innerText) : (type==='تاكسي'?3000:2000);
     if (!App.userLocation) return alert('⚠️ لم يتم تحديد موقعك الحالي.');
+    
     const tripData = {
       customer_id: App.user.id, service_type: type, dropoff_address: dest,
-      status: 'قيد الانتظار', pickup_lat: App.userLocation.lat, pickup_lng: App.userLocation.lng, final_price: finalPrice
+      status: 'قيد الانتظار', pickup_lat: App.userLocation.lat, pickup_lng: App.userLocation.lng,
+      final_price: finalPrice, payment_method: 'cash', payment_status: 'غير مدفوع'
     };
-    if (App.destLocation) {
-      tripData.dropoff_lat = App.destLocation.lat;
-      tripData.dropoff_lng = App.destLocation.lng;
+    if (App.destLocation) { tripData.dropoff_lat = App.destLocation.lat; tripData.dropoff_lng = App.destLocation.lng; }
+    
+    const { error } = await App.db.from('trips').insert(tripData);
+    if (error) return alert('❌ فشل الإرسال: ' + error.message);
+    
+    Notifications.show('🚀 تم إرسال طلبك!', `سيتم البحث عن ${type} قريب...\n💵 الدفع: نقدًا عند الوصول`, 'success');
+    setTimeout(() => App.router('home'), 3000);
+  },
+  
+  fetchMyTrips: async () => {
+    if (!App.user?.id) return [];
+    const { data, error } = await App.db.from('trips').select('*').eq('customer_id', App.user.id).order('created_at',{ascending:false}).limit(20);
+    return error ? [] : (data || []);
+  },
+  
+  acceptTrip: async (tripId) => {
+    const { error } = await App.db.from('trips').update({ status:'مقبولة', driver_id:App.user.id, accepted_at:new Date().toISOString() }).eq('id',tripId);
+    if (error) { alert('❌ فشل قبول الرحلة: '+error.message); return false; }
+    Notifications.show('✅ قبلت الرحلة', 'توجه إلى موقع العميل', 'success'); return true;
+  },
+  
+  completeTrip: async (tripId) => {
+    // ✅ تحديث الرحلة + تسجيل الدفع النقدي
+    const { error } = await App.db.from('trips').update({ 
+      status:'مكتملة', completed_at:new Date().toISOString(), payment_status:'مدفوع' 
+    }).eq('id',tripId);
+    if (error) { alert('❌ فشل إكمال الرحلة: '+error.message); return false; }
+    
+    // زيادة أرباح السائق
+    const trip = (await App.db.from('trips').select('final_price').eq('id',tripId).single()).data;
+    if (trip?.final_price) {
+      await App.db.rpc('increment_driver_earnings',{ driver_id:App.user.id, amount:trip.final_price });
     }
-    const res = await App.db.from('trips').insert(tripData);
-    if (res.error) return alert('❌ فشل الإرسال: ' + res.error.message);
-    alert('🚀 تم إرسال طلب ' + type + ' بنجاح!\nالسعر: ' + finalPrice + ' د.ع');
-    App.router('home');
+    Notifications.show('✅ اكتملت الرحلة', 'تم استلام الدفع نقداً ✓', 'success'); return true;
   }
 };
 
@@ -1246,21 +807,18 @@ const Profile = {
   edit: () => {
     if (!App.profile) return alert('⚠️ البيانات غير محملة');
     const newName = prompt('الاسم الجديد:', App.profile.name);
-    if (!newName || newName.trim() === '') return;
-    const newGender = prompt('الجنس (ذكر/أنثى):', App.profile.gender || 'ذكر');
-    Profile.update({ name: newName.trim(), gender: newGender });
+    if (!newName?.trim()) return;
+    const newGender = prompt('الجنس (ذكر/أنثى):', App.profile.gender||'ذكر');
+    Profile.update({ name:newName.trim(), gender:newGender });
   },
   update: async (data) => {
     try {
-      if (!App.user || !App.user.id) throw new Error('المستخدم غير معرف');
+      if (!App.user?.id) throw new Error('المستخدم غير معرف');
       const res = await App.db.from('profiles').update(data).eq('id', App.user.id);
       if (res.error) throw res.error;
       if (App.profile) Object.assign(App.profile, data);
-      alert('✅ تم تحديث الملف الشخصي بنجاح');
-      App.router('profile');
-    } catch (err) {
-      alert('❌ فشل التحديث: ' + (err.message || err));
-    }
+      alert('✅ تم تحديث الملف الشخصي بنجاح'); App.router('profile');
+    } catch (err) { alert('❌ فشل التحديث: '+(err.message||err)); }
   }
 };
 
@@ -1270,7 +828,14 @@ const Profile = {
 const Driver = {
   fetchNearbyTrips: async () => {
     if (!App.userLocation) return alert('⚠️ يرجى تفعيل الموقع أولاً');
-    alert('🔍 جاري البحث عن رحلات قريبة...');
+    const { data, error } = await App.db.from('trips').select(`*,customer:customer_id(name,phone)`).eq('status','قيد الانتظار').is('driver_id',null).order('created_at',{ascending:false}).limit(10);
+    if (error) { console.error('Error:',error); return []; }
+    const nearby = data.filter(t => t.pickup_lat && t.pickup_lng && MapUtils.calculateDistance(App.userLocation.lat,App.userLocation.lng,t.pickup_lat,t.pickup_lng)<=5);
+    if (nearby.length===0) return alert('🔍 لا توجد رحلات قريبة حالياً');
+    nearby.forEach(t => {
+      const dist = MapUtils.calculateDistance(App.userLocation.lat,App.userLocation.lng,t.pickup_lat,t.pickup_lng).toFixed(1);
+      Notifications.show('🚀 طلب جديد!', `مسافة: ${dist} كم - ${t.service_type}\n💵 الدفع: كاش`, 'trip', ()=>Driver.acceptTrip(t.id));
+    });
   }
 };
 
@@ -1279,22 +844,31 @@ const Driver = {
 // ==========================================
 const Store = {
   toggleStatus: async (status) => {
-    if (App.profile?.role !== 'صاحب متجر') return;
+    if (!App.user?.id) return;
     try {
-      App.ensureDb();
-      await App.db.from('profiles').update({ store_status: status }).eq('id', App.user.id);
+      await App.db.from('profiles').update({ store_status:status, status_updated_at:new Date().toISOString() }).eq('id',App.user.id);
       if (App.profile) App.profile.store_status = status;
       App.router('dashboard');
-      alert(status === 'مفتوح' ? '🟢 متجرك مفتوح الآن' : '🔴 تم إغلاق المتجر');
-    } catch (err) { alert('❌ فشل التحديث: ' + err.message); }
+      Notifications.show(status==='مفتوح'?'🟢 المتجر مفتوح':'🔴 المتجر مغلق', status==='مفتوح'?'متجرك يستقبل طلبات جديدة الآن':'تم إيقاف استقبال الطلبات', 'success');
+    } catch (err) { alert('❌ فشل التحديث: '+err.message); }
   },
-  
   fetchNewOrders: async () => {
-    alert('🔔 جاري جلب الطلبات الجديدة...');
+    if (!App.user?.id) return [];
+    const { data, error } = await App.db.from('orders').select(`*,customer:customer_id(name,phone),items:order_items(*)`).eq('store_id',App.user.id).in('status',['جديد','قيد التحضير']).order('created_at',{ascending:false});
+    if (error) { console.error('Error:',error); return []; }
+    if (!data?.length) return alert('📭 لا توجد طلبات جديدة');
+    data.forEach(o => Notifications.show('📦 طلب جديد!', `من: ${o.customer?.name}\n💵 الدفع: كاش`, 'order', ()=>Store.acceptOrder(o.id)));
+    return data;
   },
-  
+  acceptOrder: async (orderId) => {
+    const { error } = await App.db.from('orders').update({ status:'مقبول', accepted_at:new Date().toISOString() }).eq('id',orderId);
+    if (error) { alert('❌ فشل قبول الطلب: '+error.message); return false; }
+    Notifications.show('✅ تم قبول الطلب', 'ابدأ التحضير - الدفع عند الاستلام', 'success'); return true;
+  },
   trackDeliveries: async () => {
-    alert('🚚 جاري تتبع طلبات التوصيل...');
+    if (!App.user?.id) return [];
+    const { data, error } = await App.db.from('orders').select(`*,customer:customer_id(name,phone,latitude,longitude),driver:driver_id(name,phone)`).eq('store_id',App.user.id).eq('status','قيد التوصيل').order('created_at',{ascending:false});
+    return error ? [] : (data||[]);
   }
 };
 
@@ -1302,75 +876,22 @@ const Store = {
 // ⭐ Rating Module
 // ==========================================
 const Rating = {
-  renderStars: (avgRating) => {
-    const fullStars = Math.floor(avgRating);
-    const hasHalf = avgRating % 1 >= 0.5;
-    let html = '';
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) html += '⭐';
-      else if (i === fullStars && hasHalf) html += '🌟';
-      else html += '☆';
-    }
-    return html;
-  },
-  showRatingModal: (tripId, revieweeId, revieweeName, onComplete) => {
-    const modal = document.getElementById('global-modal');
-    const body = document.getElementById('modal-body');
-    if (!modal || !body) return;
-    body.innerHTML = `
-      <h3 style="text-align:center; margin-bottom:20px;">⭐ قيّم ${revieweeName}</h3>
-      <div style="text-align:center; margin:20px 0;">
-        <div id="rating-input" class="rating-stars" style="font-size:2rem; cursor:pointer;">
-          ☆ ☆ ☆ ☆ ☆
-        </div>
-        <input type="hidden" id="rating-value" value="0">
-      </div>
-      <div class="form-group">
-        <label>تعليقك (يظهر للإدارة فقط):</label>
-        <textarea id="rating-comment" class="input-field" rows="3" placeholder="اكتب رأيك هنا..."></textarea>
-      </div>
-      <button onclick="Rating.submit('${tripId}', '${revieweeId}')" class="btn btn-primary">إرسال التقييم</button>
-    `;
-    const starsContainer = body.querySelector('#rating-input');
-    if (starsContainer) {
-      starsContainer.onclick = (e) => {
-        const value = e.target.dataset.value || 1;
-        document.getElementById('rating-value').value = value;
-        starsContainer.innerHTML = Rating.renderStars(value);
-      };
-    }
-    modal.classList.remove('hidden');
-  },
+  renderStars: (avg) => { const full=Math.floor(avg), half=avg%1>=0.5; let h=''; for(let i=0;i<5;i++) h+= i<full?'⭐':(i===full&&half?'🌟':'☆'); return h; },
   submit: async (tripId, revieweeId) => {
-    const rating = parseInt(document.getElementById('rating-value')?.value || '0');
-    const comment = document.getElementById('rating-comment')?.value.trim() || '';
-    if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    // ✅ التصحيح:  existing
-    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    const rating = parseInt(document.getElementById('rating-value')?.value||'0'), comment = document.getElementById('rating-comment')?.value.trim()||'';
+    if (rating<1) return alert('⚠️ يرجى اختيار عدد النجوم');
+    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id',tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
-    const { error } = await App.db.from('reviews').insert({
-      trip_id: tripId,
-      reviewer_id: App.user?.id,
-      reviewee_id: revieweeId,
-      rating,
-      comment: comment || null
-    });
-    if (error) return alert('❌ فشل إرسال التقييم: ' + error.message);
+    const { error } = await App.db.from('reviews').insert({ trip_id:tripId, reviewer_id:App.user?.id, reviewee_id:revieweeId, rating, comment:comment||null });
+    if (error) return alert('❌ فشل التقييم: '+error.message);
     await Rating.updateAverage(revieweeId);
-    document.getElementById('global-modal')?.classList.add('hidden');
-    alert('✅ شكراً لتقييمك!');
+    document.getElementById('global-modal')?.classList.add('hidden'); alert('✅ شكراً لتقييمك!');
   },
   updateAverage: async (userId) => {
-    const { data } = await App.db.from('reviews')
-      .select('rating')
-      .eq('reviewee_id', userId);
-    if (!data || data.length === 0) return;
-    const sum = data.reduce((acc, r) => acc + r.rating, 0);
-    const avg = sum / data.length;
-    await App.db.from('profiles').update({
-      avg_rating: parseFloat(avg.toFixed(2)),
-      rating_count: data.length
-    }).eq('id', userId);
+    const { data } = await App.db.from('reviews').select('rating').eq('reviewee_id',userId);
+    if (!data?.length) return;
+    const avg = data.reduce((a,r)=>a+r.rating,0)/data.length;
+    await App.db.from('profiles').update({ avg_rating:parseFloat(avg.toFixed(2)), rating_count:data.length }).eq('id',userId);
   }
 };
 
@@ -1379,66 +900,28 @@ const Rating = {
 // ==========================================
 const Messages = {
   openChatModal: () => {
-    const modal = document.getElementById('global-modal');
-    const body = document.getElementById('modal-body');
-    if (!modal || !body) return;
-    body.innerHTML = `
-      <h3 style="text-align:center; margin-bottom:15px;">💬 مراسلة الإدارة</h3>
-      <div id="chat-messages" style="max-height:300px; overflow-y:auto; margin-bottom:15px; padding:10px; background:#f8fafc; border-radius:12px;"></div>
-      <div style="display:flex; gap:10px;">
-        <input type="text" id="chat-input" class="input-field" placeholder="اكتب رسالتك..." style="flex:1;">
-        <button onclick="Messages.send()" class="btn btn-primary" style="width:auto; padding:12px 20px;">إرسال</button>
-      </div>
-      <p style="font-size:11px; color:var(--text-muted); margin-top:10px; text-align:center;">
-        ⏳ تُحفظ الرسائل لمدة 24 ساعة فقط
-      </p>
-    `;
-    modal.classList.remove('hidden');
-    Messages.fetch();
+    const modal=document.getElementById('global-modal'), body=document.getElementById('modal-body');
+    if (!modal||!body) return;
+    body.innerHTML = `<h3 style="text-align:center;margin-bottom:15px;">💬 مراسلة الإدارة</h3>
+      <div id="chat-messages" style="max-height:300px;overflow-y:auto;margin-bottom:15px;padding:10px;background:#f8fafc;border-radius:12px;"></div>
+      <div style="display:flex;gap:10px;"><input type="text" id="chat-input" class="input-field" placeholder="اكتب رسالتك..." style="flex:1;"><button onclick="Messages.send()" class="btn btn-primary" style="width:auto;padding:12px 20px;">إرسال</button></div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center;">⏳ تُحفظ الرسائل لمدة 24 ساعة فقط</p>`;
+    modal.classList.remove('hidden'); Messages.fetch();
   },
   fetch: async () => {
-    const container = document.getElementById('chat-messages');
-    if (!container) return;
+    const container = document.getElementById('chat-messages'); if (!container) return;
     container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">جاري التحميل...</div>';
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data } = await App.db.from('messages')
-      .select('*')
-      .or(`sender_id.eq.${App.user?.id},receiver_id.eq.${App.user?.id}`)
-      .gte('created_at', twentyFourHoursAgo)
-      .order('created_at', { ascending: true });
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="text-center" style="color:var(--text-muted);">لا توجد رسائل</div>';
-      return;
-    }
-    container.innerHTML = data.map(msg => {
-      const isSent = msg.sender_id === App.user?.id;
-      const time = new Date(msg.created_at).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="message-bubble ${isSent ? 'msg-sent' : 'msg-received'} ${!msg.is_read && !isSent ? 'msg-unread' : ''}">
-          ${msg.content}
-          <span class="msg-status">${time} ${!msg.is_read && !isSent ? '• 🟡 جديد' : ''}</span>
-        </div>
-      `;
-    }).join('');
-    container.scrollTop = container.scrollHeight;
-    const unreadIds = data.filter(m => !m.is_read && m.receiver_id === App.user?.id).map(m => m.id);
-    if (unreadIds.length > 0) {
-      await App.db.from('messages').update({ is_read: true }).in('id', unreadIds);
-    }
+    const { data } = await App.db.from('messages').select('*').or(`sender_id.eq.${App.user?.id},receiver_id.eq.${App.user?.id}`).gte('created_at',new Date(Date.now()-24*60*60*1000).toISOString()).order('created_at',{ascending:true});
+    if (!data?.length) { container.innerHTML='<div class="text-center" style="color:var(--text-muted);">لا توجد رسائل</div>'; return; }
+    container.innerHTML = data.map(m=>{const sent=m.sender_id===App.user?.id,t=new Date(m.created_at).toLocaleTimeString('ar-IQ',{hour:'2-digit',minute:'2-digit'});return `<div class="message-bubble ${sent?'msg-sent':'msg-received'} ${!m.is_read&&!sent?'msg-unread':''}">${m.content}<span class="msg-status">${t}${!m.is_read&&!sent?' • 🟡 جديد':''}</span></div>`}).join('');
+    container.scrollTop=container.scrollHeight;
+    const unread=data.filter(m=>!m.is_read&&m.receiver_id===App.user?.id).map(m=>m.id);
+    if (unread.length) await App.db.from('messages').update({is_read:true}).in('id',unread);
   },
   send: async () => {
-    const input = document.getElementById('chat-input');
-    const content = input?.value.trim();
-    if (!content) return;
-    const { error } = await App.db.from('messages').insert({
-      sender_id: App.user?.id,
-      receiver_id: CONFIG.ADMIN_USER_ID || App.user?.id,
-      content,
-      is_read: false
-    });
-    if (error) return alert('❌ فشل الإرسال: ' + error.message);
-    input.value = '';
-    Messages.fetch();
+    const input=document.getElementById('chat-input'), content=input?.value.trim(); if (!content) return;
+    const { error } = await App.db.from('messages').insert({ sender_id:App.user?.id, receiver_id:CONFIG.ADMIN_USER_ID||App.user?.id, content, is_read:false });
+    if (error) return alert('❌ فشل الإرسال: '+error.message); input.value=''; Messages.fetch();
   }
 };
 
@@ -1447,29 +930,18 @@ const Messages = {
 // ==========================================
 const AboutShira = {
   showModal: () => {
-    const modal = document.getElementById('global-modal');
-    const body = document.getElementById('modal-body');
-    if (!modal || !body) return;
-    body.innerHTML = `
-      <div style="text-align:center;">
-        <div style="font-size:3rem; margin-bottom:10px;">🚀</div>
-        <h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
-        <p style="color:var(--text-muted); margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
-        <div style="background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:20px; text-align:right;">
-          <p><strong>📱 الإصدار:</strong> 4.1.1</p>
-          <p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
-          <p><strong>📍 المقر:</strong> بغداد، العراق</p>
-          <p><strong>📧 الدعم:</strong> support@shira.app</p>
-        </div>
-        <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="margin-bottom:10px;">
-          <i class="fab fa-whatsapp"></i> تواصل عبر واتساب
-        </button>
-        <button onclick="Messages.openChatModal()" class="btn btn-secondary">
-          <i class="fas fa-comment"></i> مراسلة داخل التطبيق
-        </button>
+    const modal=document.getElementById('global-modal'), body=document.getElementById('modal-body'); if (!modal||!body) return;
+    body.innerHTML = `<div style="text-align:center;">
+      <div style="font-size:3rem;margin-bottom:10px;">🚀</div><h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
+      <p style="color:var(--text-muted);margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
+      <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:20px;text-align:right;">
+        <p><strong>📱 الإصدار:</strong> 4.1.1</p><p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
+        <p><strong>📍 المقر:</strong> بغداد، العراق</p><p><strong>📧 الدعم:</strong> support@shira.app</p>
+        <p style="color:#16a34a;font-weight:600;">💵 جميع التعاملات: دفع نقدي (كاش)</p>
       </div>
-    `;
-    modal.classList.remove('hidden');
+      <button onclick="Utils.openWhatsApp()" class="btn btn-outline" style="margin-bottom:10px;"><i class="fab fa-whatsapp"></i> تواصل عبر واتساب</button>
+      <button onclick="Messages.openChatModal()" class="btn btn-secondary"><i class="fas fa-comment"></i> مراسلة داخل التطبيق</button>
+    </div>`; modal.classList.remove('hidden');
   }
 };
 
@@ -1477,274 +949,95 @@ const AboutShira = {
 // 🛠️ Utils Module
 // ==========================================
 const Utils = {
-  compressImage: async (file, maxWidth, quality) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          if (width > maxWidth) {
-            height = (maxWidth / width) * height;
-            width = maxWidth;
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
-        };
-      };
-    });
-  },
-  openWhatsApp: () => {
-    window.open('https://wa.me/9647722507019', '_blank');
-  },
-  openInAppChat: () => {
-    Messages.openChatModal();
-  },
-  showSkeleton: (selector) => {
-    const el = document.querySelector(selector);
-    if (!el) return;
-    el.innerHTML = `
-      <div class="skeleton" style="height:20px; width:80%; margin:10px auto;"></div>
-      <div class="skeleton" style="height:20px; width:60%; margin:10px auto;"></div>
-      <div class="skeleton" style="height:100px; width:100%; margin:10px auto; border-radius:12px;"></div>
-      <div class="skeleton" style="height:20px; width:90%; margin:10px auto;"></div>
-    `;
-  },
-  hideSkeleton: (selector) => {}
+  compressImage: async (file,maxWidth,quality) => new Promise((resolve)=>{
+    const reader=new FileReader(); reader.readAsDataURL(file);
+    reader.onload=(e)=>{ const img=new Image(); img.src=e.target.result;
+      img.onload=()=>{ const canvas=document.createElement('canvas'); let w=img.width,h=img.height;
+        if (w>maxWidth){ h=(maxWidth/w)*h; w=maxWidth; }
+        canvas.width=w; canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
+        canvas.toBlob((blob)=>resolve(blob),'image/jpeg',quality); }; }; }),
+  openWhatsApp: ()=>window.open('https://wa.me/9647722507019','_blank'),
+  openInAppChat: ()=>Messages.openChatModal(),
+  showSkeleton: (sel)=>{ const el=document.querySelector(sel); if (!el) return;
+    el.innerHTML='<div class="skeleton" style="height:20px;width:80%;margin:10px auto;"></div><div class="skeleton" style="height:20px;width:60%;margin:10px auto;"></div><div class="skeleton" style="height:100px;width:100%;margin:10px auto;border-radius:12px;"></div><div class="skeleton" style="height:20px;width:90%;margin:10px auto;"></div>'; },
+  hideSkeleton: ()=>{}
 };
 
 // ==========================================
-// 🎨 دالة النافذة المنبثقة الأنيقة
+// 🎨 Custom Alert
 // ==========================================
-const showCustomAlert = (title, message, onConfirm, onCancel) => {
-  const hasCancel = typeof onCancel === 'function';
-  
-  const modal = document.createElement('div');
-  modal.className = 'custom-alert-overlay';
-  modal.style.cssText = `
-    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 10000; padding: 20px; animation: fadeIn 0.3s ease;
-  `;
-  
-  modal.innerHTML = `
-    <div style="
-      background: white; border-radius: 20px; padding: 30px 25px;
-      max-width: 400px; width: 100%; text-align: center;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: slideUp 0.4s ease;
-    ">
-      <div style="
-        width: 70px; height: 70px;
-        background: linear-gradient(135deg, #f59e0b, #d97706);
-        border-radius: 50%; display: flex; align-items: center;
-        justify-content: center; margin: 0 auto 20px; font-size: 35px;
-      ">${hasCancel ? '⚠️' : '✅'}</div>
-      <h3 style="margin: 0 0 10px; color: #1e293b; font-size: 22px; font-weight: 700;">${title}</h3>
-      <p style="margin: 0 0 25px; color: #64748b; font-size: 15px; line-height: 1.6; white-space: pre-line;">${message}</p>
-      <div style="display: grid; grid-template-columns: ${hasCancel ? '1fr 1fr' : '1fr'}; gap: 10px;">
-        <button onclick="this.closest('.custom-alert-overlay').remove(); ${onConfirm ? 'onConfirm()' : ''}" style="
-          padding: 14px; background: linear-gradient(135deg, #f59e0b, #d97706);
-          color: white; border: none; border-radius: 12px;
-          font-size: 16px; font-weight: 600; cursor: pointer;
-        ">
-          ${hasCancel ? 'حسنًا' : 'إغلاق'}
-        </button>
-        ${hasCancel ? `
-        <button onclick="this.closest('.custom-alert-overlay').remove(); if(typeof onCancel==='function')onCancel()" style="
-          padding: 14px; background: #e2e8f0; color: #475569;
-          border: none; border-radius: 12px;
-          font-size: 16px; font-weight: 600; cursor: pointer;
-        ">
-          إلغاء
-        </button>
-        ` : ''}
-      </div>
-    </div>
-  `;
-  
+const showCustomAlert = (title,message,onConfirm,onCancel) => {
+  const hasCancel=typeof onCancel==='function', modal=document.createElement('div');
+  modal.className='custom-alert-overlay'; modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:fadeIn 0.3s ease;';
+  modal.innerHTML=`<div style="background:white;border-radius:20px;padding:30px 25px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:slideUp 0.4s ease;">
+    <div style="width:70px;height:70px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:35px;">${hasCancel?'⚠️':'✅'}</div>
+    <h3 style="margin:0 0 10px;color:#1e293b;font-size:22px;font-weight:700;">${title}</h3>
+    <p style="margin:0 0 25px;color:#64748b;font-size:15px;line-height:1.6;white-space:pre-line;">${message}</p>
+    <div style="display:grid;grid-template-columns:${hasCancel?'1fr 1fr':'1fr'};gap:10px;">
+      <button onclick="this.closest('.custom-alert-overlay').remove();${onConfirm?'onConfirm()':''}" style="padding:14px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">${hasCancel?'حسنًا':'إغلاق'}</button>
+      ${hasCancel?`<button onclick="this.closest('.custom-alert-overlay').remove();if(typeof onCancel==='function')onCancel()" style="padding:14px;background:#e2e8f0;color:#475569;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">إلغاء</button>`:''}
+    </div></div>`;
   document.body.appendChild(modal);
-  
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-  `;
+  const style=document.createElement('style'); style.textContent='@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(50px);opacity:0}to{transform:translateY(0);opacity:1}}';
   document.head.appendChild(style);
 };
 
 // ==========================================
-// 🎨 استبدال نوافذ المتصفح الافتراضية
+// 🎨 Override Browser Alerts
 // ==========================================
-window.alert = (message) => {
-  showCustomAlert('تنبيه', message, null);
-};
-
-window.confirm = (message) => {
-  return new Promise((resolve) => {
-    showCustomAlert('تأكيد', message, () => resolve(true), () => resolve(false));
-  });
-};
+window.alert = (msg)=>showCustomAlert('تنبيه',msg,null);
+window.confirm = (msg)=>new Promise((res)=>showCustomAlert('تأكيد',msg,()=>res(true),()=>res(false)));
 
 // ==========================================
 // 🔔 Notifications Module
 // ==========================================
 const Notifications = {
-  audioCtx: null,
-  toastContainer: null,
-  enabled: true,
-  
-  init: () => {
-    try {
-      Notifications.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch (e) { console.warn('🔇 Web Audio غير مدعوم'); }
-    
-    if (!document.getElementById('toast-container')) {
-      Notifications.toastContainer = document.createElement('div');
-      Notifications.toastContainer.id = 'toast-container';
-      Notifications.toastContainer.style.cssText = `
-        position: fixed; top: 80px; right: 20px; z-index: 10001;
-        display: flex; flex-direction: column; gap: 10px;
-        max-width: 320px; pointer-events: none;
-      `;
+  audioCtx:null, toastContainer:null, enabled:true,
+  init: ()=>{
+    try{ Notifications.audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){console.warn('🔇 Web Audio غير مدعوم');}
+    if (!document.getElementById('toast-container')){
+      Notifications.toastContainer=document.createElement('div'); Notifications.toastContainer.id='toast-container';
+      Notifications.toastContainer.style.cssText='position:fixed;top:80px;right:20px;z-index:10001;display:flex;flex-direction:column;gap:10px;max-width:320px;pointer-events:none;';
       document.body.appendChild(Notifications.toastContainer);
-    } else {
-      Notifications.toastContainer = document.getElementById('toast-container');
-    }
-    
-    const saved = localStorage.getItem('notifications_enabled');
-    if (saved !== null) Notifications.enabled = saved === 'true';
-    
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    } else Notifications.toastContainer=document.getElementById('toast-container');
+    const saved=localStorage.getItem('notifications_enabled'); if (saved!==null) Notifications.enabled=saved==='true';
+    if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
   },
-  
-  playTone: () => {
-    if (!Notifications.enabled || !Notifications.audioCtx) return;
-    try {
-      if (Notifications.audioCtx.state === 'suspended') Notifications.audioCtx.resume();
-      const osc = Notifications.audioCtx.createOscillator();
-      const gain = Notifications.audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(Notifications.audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, Notifications.audioCtx.currentTime);
-      osc.frequency.setValueAtTime(1100, Notifications.audioCtx.currentTime + 0.08);
-      gain.gain.setValueAtTime(0.4, Notifications.audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, Notifications.audioCtx.currentTime + 0.25);
-      osc.start();
-      osc.stop(Notifications.audioCtx.currentTime + 0.25);
-    } catch (e) {}
+  playTone: ()=>{
+    if (!Notifications.enabled||!Notifications.audioCtx) return;
+    try{ if (Notifications.audioCtx.state==='suspended') Notifications.audioCtx.resume();
+      const osc=Notifications.audioCtx.createOscillator(), gain=Notifications.audioCtx.createGain();
+      osc.connect(gain); gain.connect(Notifications.audioCtx.destination); osc.type='sine';
+      osc.frequency.setValueAtTime(880,Notifications.audioCtx.currentTime); osc.frequency.setValueAtTime(1100,Notifications.audioCtx.currentTime+0.08);
+      gain.gain.setValueAtTime(0.4,Notifications.audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,Notifications.audioCtx.currentTime+0.25);
+      osc.start(); osc.stop(Notifications.audioCtx.currentTime+0.25); }catch(e){}
   },
-  
-  show: (title, message, type = 'info', onClick = null) => {
-    if (!Notifications.enabled) return;
-    Notifications.playTone();
-    Notifications.showToast(title, message, type, onClick);
-    
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, {
-        body: message,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: `shira-${Date.now()}`,
-        requireInteraction: true
-      });
-    }
+  show: (title,message,type='info',onClick=null)=>{
+    if (!Notifications.enabled) return; Notifications.playTone(); Notifications.showToast(title,message,type,onClick);
+    if ('Notification' in window && Notification.permission==='granted') new Notification(title,{body:message,icon:'/icon-192.png',badge:'/icon-192.png',tag:`shira-${Date.now()}`,requireInteraction:true});
   },
-  
-  showToast: (title, message, type, onClick) => {
-    const colors = {
-      info: { bg: '#3b82f6', icon: '🔔' }, success: { bg: '#22c55e', icon: '✅' },
-      warning: { bg: '#f59e0b', icon: '⚠️' }, error: { bg: '#ef4444', icon: '❌' },
-      trip: { bg: '#8b5cf6', icon: '🚗' }, order: { bg: '#ec4899', icon: '📦' }
-    };
-    const style = colors[type] || colors.info;
-    const toast = document.createElement('div');
-    toast.className = 'notification-toast';
-    toast.style.cssText = `
-      background: white; border-radius: 12px; padding: 15px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.2); border-right: 4px solid ${style.bg};
-      display: flex; align-items: flex-start; gap: 12px;
-      animation: slideIn 0.3s ease; pointer-events: auto;
-      cursor: ${onClick ? 'pointer' : 'default'};
-    `;
-    toast.innerHTML = `
-      <div style="font-size: 24px; flex-shrink: 0;">${style.icon}</div>
-      <div style="flex: 1; min-width: 0;">
-        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">${title}</div>
-        <div style="font-size: 14px; color: #64748b; line-height: 1.4;">${message}</div>
-      </div>
-      <button onclick="this.closest('.notification-toast').remove()" style="
-        background: none; border: none; font-size: 20px; color: #94a3b8;
-        cursor: pointer; padding: 0; width: 24px; height: 24px;
-        display: flex; align-items: center; justify-content: center;
-      ">&times;</button>
-    `;
-    if (onClick) {
-      toast.onclick = (e) => { if (!e.target.closest('button')) { toast.remove(); onClick(); } };
-    }
-    Notifications.toastContainer.appendChild(toast);
-    setTimeout(() => {
-      toast.style.animation = 'slideOut 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 8000);
+  showToast: (title,message,type,onClick)=>{
+    const colors={info:{bg:'#3b82f6',icon:'🔔'},success:{bg:'#22c55e',icon:'✅'},warning:{bg:'#f59e0b',icon:'⚠️'},error:{bg:'#ef4444',icon:'❌'},trip:{bg:'#8b5cf6',icon:'🚗'},order:{bg:'#ec4899',icon:'📦'}};
+    const style=colors[type]||colors.info, toast=document.createElement('div'); toast.className='notification-toast';
+    toast.style.cssText=`background:white;border-radius:12px;padding:15px;box-shadow:0 10px 40px rgba(0,0,0,0.2);border-right:4px solid ${style.bg};display:flex;align-items:flex-start;gap:12px;animation:slideIn 0.3s ease;pointer-events:auto;cursor:${onClick?'pointer':'default'};`;
+    toast.innerHTML=`<div style="font-size:24px;flex-shrink:0;">${style.icon}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;color:#1e293b;margin-bottom:4px;">${title}</div><div style="font-size:14px;color:#64748b;line-height:1.4;">${message}</div></div><button onclick="this.closest('.notification-toast').remove()" style="background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>`;
+    if (onClick) toast.onclick=(e)=>{if (!e.target.closest('button')){toast.remove();onClick();}};
+    Notifications.toastContainer.appendChild(toast); setTimeout(()=>{toast.style.animation='slideOut 0.3s ease';setTimeout(()=>toast.remove(),300);},8000);
   },
-  
-  toggle: () => {
-    Notifications.enabled = !Notifications.enabled;
-    localStorage.setItem('notifications_enabled', Notifications.enabled);
-    return Notifications.enabled;
-  },
-  
-  subscribeToUpdates: () => {
+  toggle: ()=>{ Notifications.enabled=!Notifications.enabled; localStorage.setItem('notifications_enabled',Notifications.enabled); return Notifications.enabled; },
+  subscribeToUpdates: ()=>{
     if (!App.user?.id) return;
-    
-    App.db.channel('messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${App.user.id}` }, 
-        (payload) => { if (payload.new.sender_id !== App.user.id) Notifications.show('💬 رسالة جديدة', 'لديك رسالة جديدة من الإدارة', 'info', () => App.router('profile')); })
-      .subscribe();
-      
-    if (['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(App.profile?.role)) {
-      App.db.channel('trips')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trips', filter: `status=eq.قيد الانتظار` },
-          () => Notifications.show('🚀 طلب جديد!', 'اضغط لعرض تفاصيل الطلب', 'trip', () => App.router('dashboard')))
-        .subscribe();
-    }
-    
-    if (App.profile?.role === 'صاحب متجر') {
-      App.db.channel('orders')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${App.user.id}` },
-          () => Notifications.show('📦 طلب جديد في متجرك!', 'اضغط لمراجعة الطلب', 'order', () => App.router('dashboard')))
-        .subscribe();
-    }
+    App.db.channel('messages').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`receiver_id=eq.${App.user.id}`},(p)=>{if (p.new.sender_id!==App.user.id) Notifications.show('💬 رسالة جديدة','لديك رسالة جديدة من الإدارة','info',()=>App.router('profile'));}).subscribe();
+    if (['سائق تكسي','سائق توك توك','دلفري'].includes(App.profile?.role)) App.db.channel('trips').on('postgres_changes',{event:'INSERT',schema:'public',table:'trips',filter:'status=eq.قيد الانتظار'},()=>Notifications.show('🚀 طلب جديد!','اضغط لعرض تفاصيل الطلب 💵 كاش','trip',()=>App.router('dashboard'))).subscribe();
+    if (App.profile?.role==='صاحب متجر') App.db.channel('orders').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders',filter:`store_id=eq.${App.user.id}`},()=>Notifications.show('📦 طلب جديد في متجرك!','اضغط لمراجعة الطلب 💵 دفع عند الاستلام','order',()=>App.router('dashboard'))).subscribe();
   }
 };
 
-// ✅ أنيميشن الإشعارات
-if (!document.getElementById('notif-anim-style')) {
-  const s = document.createElement('style');
-  s.id = 'notif-anim-style';
-  s.textContent = `@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100px);opacity:0}}`;
-  document.head.appendChild(s);
-}
+// ✅ Animations
+if (!document.getElementById('notif-anim-style')){const s=document.createElement('style');s.id='notif-anim-style';s.textContent='@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100px);opacity:0}}';document.head.appendChild(s);}
 
 // ==========================================
-// 🚀 التهيئة النهائية
+// 🚀 Final Init
 // ==========================================
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    App.init();
-    if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
-  });
-} else {
-  App.init();
-  if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
-}
+if (document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{App.init();if (App.user){Notifications.init();Notifications.subscribeToUpdates();}});}
+else {App.init();if (App.user){Notifications.init();Notifications.subscribeToUpdates();}}
