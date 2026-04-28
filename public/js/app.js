@@ -1,8 +1,25 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v4.1.1
+// شراع | Shira Platform - Core Application Engine v4.1.2
 // ✅ نسخة جاهزة للإنتاج - جميع التعاملات نقدية (كاش)
+// ✅ التسوق: عرض كل المتاجر والمنتجات + سلة متعددة المتاجر
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
+
+// ⚙️ إعدادات المنصة (ضروري للنشر)
+const CONFIG = {
+  SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
+  SUPABASE_KEY: 'YOUR_ANON_KEY',
+  STORAGE_BUCKETS: {
+    avatars: 'avatars',
+    vehicles: 'vehicles', 
+    products: 'products',
+    stores: 'stores'
+  },
+  MAP_CENTER: [33.3152, 44.3661], // بغداد
+  ADMIN_USER_ID: 'admin-uuid-here',
+  APP_VERSION: '4.1.2',
+  CASH_ONLY: true // ✅ جميع التعاملات نقدية
+};
 
 const App = {
   db: null,
@@ -17,6 +34,7 @@ const App = {
   userLocation: null,
   destLocation: null,
   subscriptionTimer: null,
+  cart: [], // 🛒 سلة متعددة المتاجر: [{storeId, storeName, id, name, price, qty}]
 
   init: async () => {
     try {
@@ -224,7 +242,11 @@ const App = {
         case 'home': container.innerHTML = Views.home(); if (headerTitle) headerTitle.innerText = 'الرئيسية'; break;
         case 'dashboard': container.innerHTML = Views.dashboard(); if (headerTitle) headerTitle.innerText = 'لوحة التحكم'; break;
         case 'request-ride': container.innerHTML = Views.requestRide(payload); if (headerTitle) headerTitle.innerText = 'طلب رحلة'; break;
-        case 'shopping': container.innerHTML = Views.shopping(); if (headerTitle) headerTitle.innerText = 'التسوق'; break;
+        case 'shopping': 
+          container.innerHTML = Views.shopping(); 
+          if (headerTitle) headerTitle.innerText = 'التسوق';
+          setTimeout(() => Shopping.loadStores(), 100); // ✅ تحميل المتاجر بعد رسم الواجهة
+          break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
         case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
         case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
@@ -242,6 +264,7 @@ const App = {
     if (route === 'delivery-map') {
       setTimeout(() => MapUtils.initHeatMap(), 100);
     }
+    // ✅ shopping يتم تحميله في الـ switch أعلاه
   },
 
   setupListeners: () => {
@@ -383,12 +406,65 @@ const Views = {
     return Views.dashboard();
   },
   
+  // ✅ مكتمل: قسم التسوق - واجهة فقط (التحميل عبر Shopping.loadStores)
   shopping: () => {
-    return `<div class="text-center" style="padding:40px 20px;">
-      <div style="font-size:60px;margin-bottom:20px;">🛒</div>
-      <h2 style="margin-bottom:15px;">قسم التسوق</h2>
-      <p style="color:var(--text-muted);margin-bottom:30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
-      <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
+    return `<div style="margin-bottom:15px;">
+              <input type="text" id="store-search" placeholder="🔍 ابحث عن متجر..." class="input-field" onkeyup="Shopping.searchStores()">
+            </div>
+            <div id="stores-list" style="display:flex;flex-direction:column;gap:10px;">
+              <div style="text-align:center;padding:20px;color:var(--text-muted);">⏳ جاري تحميل المتاجر...</div>
+            </div>
+            <button onclick="App.router('home')" class="btn btn-outline mt-2">العودة</button>`;
+  },
+  
+  // ✅ مكتمل: سجل الطلبات
+  myOrders: async () => {
+    const [trips, orders] = await Promise.all([
+      App.db.from('trips').select('*,driver:driver_id(name,phone)').eq('customer_id', App.user.id).order('created_at',{ascending:false}).limit(20),
+      App.db.from('orders').select('*,store:store_id(name),driver:driver_id(name)').eq('customer_id', App.user.id).order('created_at',{ascending:false}).limit(20)
+    ]);
+    const all = [...(trips.data||[]).map(t=>({...t,type:'trip'})), ...(orders.data||[]).map(o=>({...o,type:'order'}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    
+    return `<div style="display:flex;flex-direction:column;gap:10px;">${all.map(item => `
+      <div class="card" style="text-align:right;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="background:${item.type==='trip'?'#dbeafe':'#dcfce7'};padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">${item.type==='trip'?'🚗 رحلة':'📦 طلب'}</span>
+          <span style="font-size:12px;color:var(--text-muted);">${new Date(item.created_at).toLocaleDateString('ar-IQ')}</span>
+        </div>
+        <p style="margin:5px 0;font-weight:600;">${item.type==='trip'?item.dropoff_address:item.store?.name}</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <strong style="color:var(--primary);">${item.final_price||item.total_price} د.ع</strong>
+          <span style="background:${item.status==='مكتملة'||item.status==='مكتمل'?'#22c55e':'#f59e0b'};color:white;padding:4px 12px;border-radius:20px;font-size:11px;">${item.status}</span>
+        </div>
+        ${item.type==='trip'&&item.status==='مكتملة'&&!item.rated?`<button onclick="Rating.openModal('${item.id}','${item.driver_id}')" style="margin-top:8px;padding:6px 12px;background:var(--p);color:white;border:none;border-radius:8px;font-size:12px;cursor:pointer;">⭐ تقييم السائق</button>`:''}
+      </div>`).join('') || '<p class="text-center" style="color:var(--text-muted);padding:30px;">لا توجد طلبات سابقة</p>'}</div>
+    <button onclick="App.router('home')" class="btn btn-outline mt-2">العودة</button>`;
+  },
+  
+  // ✅ مكتمل: إدارة المنتجات (لصاحب المتجر)
+  storeProducts: async () => {
+    if (!App.user?.id) return Views.dashboard();
+    const {  products } = await App.db.from('products').select('*').eq('store_id', App.user.id).order('created_at',{ascending:false});
+    
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+      <h2>📦 منتجاتي</h2>
+      <button onclick="Store.openAddProductModal()" class="btn btn-primary" style="padding:8px 16px;font-size:13px;">➕ إضافة</button>
+    </div>
+    <div style="display:grid;gap:10px;">${(products||[]).map(p => `
+      <div class="card" style="display:flex;gap:12px;align-items:center;text-align:right;">
+        <img src="${p.image_url||'https://via.placeholder.com/60'}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;">
+        <div style="flex:1;">
+          <h4 style="margin:0;font-size:14px;">${p.name}</h4>
+          <p style="margin:3px 0;color:var(--primary);font-weight:600;">${p.price} د.ع</p>
+          <small style="color:var(--text-muted);">${p.category||'بدون فئة'}</small>
+        </div>
+        <span style="background:${p.status==='نشط'?'#22c55e':'#f59e0b'};color:white;padding:4px 10px;border-radius:12px;font-size:11px;">${p.status}</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="Store.editProduct('${p.id}')" style="padding:6px;background:#64748b;color:white;border:none;border-radius:6px;cursor:pointer;">✏️</button>
+          <button onclick="Store.deleteProduct('${p.id}')" style="padding:6px;background:#ef4444;color:white;border:none;border-radius:6px;cursor:pointer;">🗑️</button>
+        </div>
+      </div>`).join('') || '<p class="text-center" style="color:var(--text-muted);">لا توجد منتجات مضافة</p>'}</div>
+    <button onclick="App.router('dashboard')" class="btn btn-outline mt-2">العودة</button>`;
   },
   
   dashboard: () => {
@@ -464,33 +540,6 @@ const Views = {
       <div class="card" onclick="App.router('profile')"><div class="icon">📊</div><h3>الملف الشخصي</h3></div>`;
   },
   
-  myOrders: () => `<div class="text-center" style="padding:40px 20px;">
-    <div style="font-size:60px;margin-bottom:20px;">📦</div><h2>طلباتي</h2>
-    <p style="color:var(--text-muted);margin-bottom:30px;">سجل جميع طلباتك السابقة والحالية</p>
-    <button onclick="App.router('home')" class="btn btn-outline">العودة</button></div>`,
-  
-  storeProducts: () => `<div class="text-center" style="padding:40px 20px;">
-    <div style="font-size:60px;margin-bottom:20px;">📦</div><h2>إدارة المنتجات</h2>
-    <p style="color:var(--text-muted);margin-bottom:30px;">إضافة، تعديل، وحذف المنتجات</p>
-    <button class="btn btn-primary" style="margin-bottom:20px;">➕ إضافة منتج جديد</button>
-    <div class="card" style="margin-bottom:10px;text-align:right;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div><strong>منتج مثال</strong><p style="color:var(--text-muted);font-size:13px;margin:5px 0;">السعر: 5,000 د.ع</p></div>
-        <span class="badge" style="background:var(--green);color:white;padding:4px 10px;border-radius:20px;font-size:12px;">✅ متوفر</span>
-      </div>
-    </div>
-    <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button></div>`,
-  
-  deliveryMap: () => `<div class="map-wrapper" style="height:400px;border-radius:12px;overflow:hidden;margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
-    <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:15px;">
-      <h4 style="margin-bottom:10px;">🔥 خريطة المناطق الساخنة</h4>
-      <div style="display:flex;gap:10px;font-size:13px;">
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#ef4444;border-radius:50%;"></span> طلبات كثيرة</span>
-        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#22c55e;border-radius:50%;"></span> طلبات قليلة</span>
-      </div>
-    </div>
-    <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>`,
-  
   requestRide: (type) => {
     const basePrice = (type === 'تاكسي') ? 3000 : 2000;
     return `<div class="map-wrapper" style="height:300px;border-radius:12px;overflow:hidden;margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
@@ -540,11 +589,21 @@ const Views = {
     <button onclick="Profile.edit()" class="btn btn-primary mb-2">✏️ تعديل الملف الشخصي</button>
     <button onclick="App.secureLogout()" class="btn btn-danger">🚪 خروج آمن</button>
     ${supportSection}`;
-  }
+  },
+  
+  deliveryMap: () => `<div class="map-wrapper" style="height:400px;border-radius:12px;overflow:hidden;margin-bottom:16px;"><div id="map" style="height:100%;"></div></div>
+    <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:15px;">
+      <h4 style="margin-bottom:10px;">🔥 خريطة المناطق الساخنة</h4>
+      <div style="display:flex;gap:10px;font-size:13px;">
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#ef4444;border-radius:50%;"></span> طلبات كثيرة</span>
+        <span style="display:flex;align-items:center;gap:5px;"><span style="width:12px;height:12px;background:#22c55e;border-radius:50%;"></span> طلبات قليلة</span>
+      </div>
+    </div>
+    <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>`
 };
 
 // ==========================================
-// 🔐 Auth Module (✅ مصحح بالكامل)
+// 🔐 Auth Module
 // ==========================================
 const Auth = {
   login: async () => {
@@ -588,20 +647,17 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
+        const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
           photoUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).getPublicUrl(upData.path).data.publicUrl;
         }
       } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    // ✅ التصحيح: signUp مع options.data
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: {
-        data: { name, phone, role, gender, age: parseInt(age) }
-      }
+      options: {  { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -622,7 +678,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
+          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             carPhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -639,7 +695,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             storePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -658,7 +714,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
+          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             bikePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -747,7 +803,7 @@ const MapUtils = {
 };
 
 // ==========================================
-// 📦 Trips Module - نظام الرحلات (دفع كاش فقط)
+// 📦 Trips Module
 // ==========================================
 const Trips = {
   request: async (type) => {
@@ -785,13 +841,11 @@ const Trips = {
   },
   
   completeTrip: async (tripId) => {
-    // ✅ تحديث الرحلة + تسجيل الدفع النقدي
     const { error } = await App.db.from('trips').update({ 
       status:'مكتملة', completed_at:new Date().toISOString(), payment_status:'مدفوع' 
     }).eq('id',tripId);
     if (error) { alert('❌ فشل إكمال الرحلة: '+error.message); return false; }
     
-    // زيادة أرباح السائق
     const trip = (await App.db.from('trips').select('final_price').eq('id',tripId).single()).data;
     if (trip?.final_price) {
       await App.db.rpc('increment_driver_earnings',{ driver_id:App.user.id, amount:trip.final_price });
@@ -852,6 +906,7 @@ const Store = {
       Notifications.show(status==='مفتوح'?'🟢 المتجر مفتوح':'🔴 المتجر مغلق', status==='مفتوح'?'متجرك يستقبل طلبات جديدة الآن':'تم إيقاف استقبال الطلبات', 'success');
     } catch (err) { alert('❌ فشل التحديث: '+err.message); }
   },
+  
   fetchNewOrders: async () => {
     if (!App.user?.id) return [];
     const { data, error } = await App.db.from('orders').select(`*,customer:customer_id(name,phone),items:order_items(*)`).eq('store_id',App.user.id).in('status',['جديد','قيد التحضير']).order('created_at',{ascending:false});
@@ -860,15 +915,329 @@ const Store = {
     data.forEach(o => Notifications.show('📦 طلب جديد!', `من: ${o.customer?.name}\n💵 الدفع: كاش`, 'order', ()=>Store.acceptOrder(o.id)));
     return data;
   },
+  
   acceptOrder: async (orderId) => {
     const { error } = await App.db.from('orders').update({ status:'مقبول', accepted_at:new Date().toISOString() }).eq('id',orderId);
     if (error) { alert('❌ فشل قبول الطلب: '+error.message); return false; }
     Notifications.show('✅ تم قبول الطلب', 'ابدأ التحضير - الدفع عند الاستلام', 'success'); return true;
   },
+  
   trackDeliveries: async () => {
     if (!App.user?.id) return [];
     const { data, error } = await App.db.from('orders').select(`*,customer:customer_id(name,phone,latitude,longitude),driver:driver_id(name,phone)`).eq('store_id',App.user.id).eq('status','قيد التوصيل').order('created_at',{ascending:false});
     return error ? [] : (data||[]);
+  },
+  
+  openAddProductModal: () => {
+    showCustomAlert('➕ إضافة منتج جديد', `
+      <form id="add-product-form" style="display:grid;gap:10px;">
+        <input type="text" id="prod-name" placeholder="اسم المنتج *" required style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <textarea id="prod-desc" placeholder="وصف المنتج" rows="2" style="padding:10px;border:1px solid #ddd;border-radius:8px;"></textarea>
+        <input type="number" id="prod-price" placeholder="السعر (د.ع) *" required min="0" step="0.01" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <input type="text" id="prod-cat" placeholder="الفئة" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <input type="file" id="prod-img" accept="image/*" style="padding:8px;border:1px solid #ddd;border-radius:8px;">
+        <select id="prod-status" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+          <option value="نشط">✅ نشط</option><option value="مخفي">🙈 مخفي</option><option value="نفذت الكمية">📭 نفذت الكمية</option>
+        </select>
+      </form>
+    `, async () => {
+      const name = document.getElementById('prod-name')?.value.trim();
+      const price = parseFloat(document.getElementById('prod-price')?.value);
+      if (!name || !price) return alert('⚠️ اسم المنتج والسعر مطلوبان');
+      
+      let imageUrl = null;
+      const file = document.getElementById('prod-img')?.files?.[0];
+      if (file) {
+        const compressed = await Utils.compressImage(file, 800, 0.85);
+        const fileName = `products/${App.user.id}/${Date.now()}.jpg`;
+        const {  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+        if (upData?.path) imageUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl;
+      }
+      
+      const { error } = await App.db.from('products').insert({
+        store_id: App.user.id, name, description: document.getElementById('prod-desc')?.value.trim()||null,
+        price, category: document.getElementById('prod-cat')?.value.trim()||null,
+        image_url: imageUrl, status: document.getElementById('prod-status')?.value||'نشط'
+      });
+      if (error) return alert('❌ فشل الإضافة: '+error.message);
+      alert('✅ تمت إضافة المنتج'); App.router('store-products');
+    });
+  },
+  
+  editProduct: async (productId) => {
+    const { data: p } = await App.db.from('products').select('*').eq('id', productId).single();
+    if (!p) return;
+    showCustomAlert('✏️ تعديل المنتج', `
+      <form id="edit-product-form" style="display:grid;gap:10px;">
+        <input type="text" id="prod-name" value="${p.name}" required style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <textarea id="prod-desc" rows="2" style="padding:10px;border:1px solid #ddd;border-radius:8px;">${p.description||''}</textarea>
+        <input type="number" id="prod-price" value="${p.price}" required min="0" step="0.01" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <input type="text" id="prod-cat" value="${p.category||''}" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <select id="prod-status" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+          <option value="نشط" ${p.status==='نشط'?'selected':''}>✅ نشط</option>
+          <option value="مخفي" ${p.status==='مخفي'?'selected':''}>🙈 مخفي</option>
+          <option value="نفذت الكمية" ${p.status==='نفذت الكمية'?'selected':''}>📭 نفذت الكمية</option>
+        </select>
+      </form>
+    `, async () => {
+      const { error } = await App.db.from('products').update({
+        name: document.getElementById('prod-name')?.value.trim(),
+        description: document.getElementById('prod-desc')?.value.trim()||null,
+        price: parseFloat(document.getElementById('prod-price')?.value),
+        category: document.getElementById('prod-cat')?.value.trim()||null,
+        status: document.getElementById('prod-status')?.value
+      }).eq('id', productId);
+      if (error) return alert('❌ فشل التحديث: '+error.message);
+      alert('✅ تم تحديث المنتج'); App.router('store-products');
+    });
+  },
+  
+  deleteProduct: async (productId) => {
+    if (!confirm('⚠️ حذف هذا المنتج نهائياً؟')) return;
+    const { error } = await App.db.from('products').delete().eq('id', productId);
+    if (error) return alert('❌ فشل الحذف: '+error.message);
+    alert('🗑️ تم حذف المنتج'); App.router('store-products');
+  }
+};
+
+// ==========================================
+// 🛒 Shopping Module - متعدد المتاجر مع سلة موحدة ✅
+// ==========================================
+const Shopping = {
+  
+  // تحميل وعرض المتاجر: جميعها ظاهرة، المفتوحة أولاً ثم المغلقة، مرتبة بالتقييم
+  loadStores: async () => {
+    const container = document.getElementById('stores-list');
+    if (!container) return;
+    if (!App.userLocation) { await App.checkGPS(); }
+    
+    // ✅ جلب جميع المتاجر النشطة (بدون فلترة store_status)
+    const {  stores, error } = await App.db.from('profiles')
+      .select('id,name,profile_image,store_type,store_status,avg_rating')
+      .eq('role', 'صاحب متجر')
+      .eq('status', 'نشط');
+
+    if (error || !stores) { container.innerHTML = '<p style="text-align:center;color:red;">❌ فشل تحميل المتاجر</p>'; return; }
+
+    // ✅ ترتيب: المفتوحة أولاً ➜ ثم المغلقة، وكل مجموعة مرتبة حسب التقييم (الأعلى أولاً)
+    stores.sort((a, b) => {
+      const openA = a.store_status === 'مفتوح';
+      const openB = b.store_status === 'مفتوح';
+      if (openA && !openB) return -1;
+      if (!openA && openB) return 1;
+      return (b.avg_rating || 0) - (a.avg_rating || 0);
+    });
+
+    if (stores.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:var(--text-muted);">لا توجد متاجر مسجلة حالياً</p>';
+      return;
+    }
+
+    container.innerHTML = stores.map(s => {
+      const isClosed = s.store_status !== 'مفتوح';
+      return `
+      <div class="card" onclick="Shopping.openStore('${s.id}','${s.name}')" style="cursor:pointer;opacity:${isClosed?0.8:1};">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <img src="${s.profile_image||'https://ui-avatars.com/api/?name='+encodeURIComponent(s.name)}" style="width:60px;height:60px;border-radius:12px;object-fit:cover;">
+          <div style="flex:1;">
+            <h4 style="margin:0;">${s.name}</h4>
+            <p style="margin:3px 0;color:var(--text-muted);font-size:13px;">${s.store_type} • ⭐ ${s.avg_rating?.toFixed(1)||'0.0'}</p>
+          </div>
+          <span style="background:${isClosed?'#fee2e2':'#dcfce7'};color:${isClosed?'#ef4444':'#166534'};padding:4px 10px;border-radius:20px;font-size:11px;font-weight:bold;">
+            ${isClosed ? 'مغلق 🔴' : 'مفتوح 🟢'}
+          </span>
+        </div>
+      </div>`;
+    }).join('');
+  },
+
+  searchStores: () => {
+    const q = document.getElementById('store-search')?.value.toLowerCase()||'';
+    document.querySelectorAll('#stores-list .card').forEach(c => {
+      const name = c.querySelector('h4')?.innerText.toLowerCase()||'';
+      c.style.display = name.includes(q) ? '' : 'none';
+    });
+  },
+
+  // فتح المتجر وعرض منتجاته (جميعها ظاهرة)
+  openStore: async (storeId, storeName) => {
+    // جلب جميع المنتجات (بدون فلترة الحالة)
+    const {  products } = await App.db.from('products')
+      .select('*')
+      .eq('store_id', storeId);
+
+    showCustomAlert(`🛒 ${storeName}`, `
+      <div style="max-height:300px;overflow-y:auto;margin-bottom:10px;">
+        ${products?.map(p => {
+          const isOutOfStock = p.status === 'نفذت الكمية';
+          return `
+          <div style="display:flex;gap:10px;padding:10px;border-bottom:1px solid #eee;align-items:center;opacity:${isOutOfStock?0.6:1}">
+            <img src="${p.image_url||'https://via.placeholder.com/60'}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;">
+            <div style="flex:1;">
+              <strong>${p.name}</strong>
+              <p style="color:var(--primary);font-weight:600;margin:3px 0;">${p.price} د.ع</p>
+              <small style="color:var(--text-muted);">${p.category||''}</small>
+            </div>
+            ${isOutOfStock 
+              ? '<span style="background:#fff7ed;color:#ea580c;padding:4px 8px;border-radius:12px;font-size:11px;font-weight:bold;">نفذت الكمية ❌</span>' 
+              : `<button onclick="Shopping.addToCart('${storeId}','${storeName}','${p.id}','${p.name}',${p.price})" style="padding:6px 12px;background:var(--p);color:white;border:none;border-radius:8px;cursor:pointer;">➕</button>`}
+          </div>`;
+        }).join('') || '<p class="text-center">لا توجد منتجات</p>'}
+      </div>
+      <button onclick="Shopping.showFullCart()" style="width:100%;padding:10px;background:#f59e0b;color:white;border:none;border-radius:8px;cursor:pointer;margin-bottom:8px;">
+        🛒 عرض السلة (${App.cart?.length||0} صنف)
+      </button>
+      <button onclick="document.getElementById('global-modal')?.classList.add('hidden')" style="width:100%;padding:10px;background:#64748b;color:white;border:none;border-radius:8px;cursor:pointer;">إغلاق</button>
+    `, null, null);
+  },
+
+  // إضافة منتج للسلة متعددة المتاجر
+  addToCart: (storeId, storeName, id, name, price) => {
+    if (!App.cart) App.cart = [];
+    const item = App.cart.find(i => i.id === id && i.storeId === storeId);
+    if (item) {
+      item.qty++;
+    } else {
+      App.cart.push({ storeId, storeName, id, name, price, qty: 1 });
+    }
+    Notifications.show('✅ تمت الإضافة', name, 'success');
+  },
+
+  // عرض السلة الكاملة مجمعة حسب المتجر مع خيارات التعديل والحذف
+  showFullCart: () => {
+    if (!App.cart?.length) return alert('🛒 السلة فارغة');
+
+    // تجميع العناصر حسب المتجر
+    const grouped = {};
+    App.cart.forEach(item => {
+      if (!grouped[item.storeId]) {
+        grouped[item.storeId] = { name: item.storeName, items: [], total: 0 };
+      }
+      grouped[item.storeId].items.push(item);
+      grouped[item.storeId].total += item.price * item.qty;
+    });
+
+    let html = `<div style="max-height:400px;overflow-y:auto;">`;
+    let grandTotal = 0;
+
+    for (const sid in grouped) {
+      const store = grouped[sid];
+      grandTotal += store.total;
+      html += `
+        <div style="background:#f8fafc;padding:10px;border-radius:8px;margin-bottom:10px;">
+          <h4 style="margin:0 0 8px;border-bottom:1px solid #ddd;padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+            📦 ${store.name}
+            <span style="color:var(--primary);font-size:13px;">${store.total.toLocaleString()} د.ع</span>
+          </h4>
+          ${store.items.map(item => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:14px;">
+              <span>${item.name} × <input type="number" value="${item.qty}" min="1" max="99" style="width:45px;padding:2px;text-align:center;border:1px solid #ddd;border-radius:4px;" onchange="Shopping.updateQty('${item.id}','${item.storeId}',this.value)"></span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:bold;">${(item.price * item.qty).toLocaleString()} د.ع</span>
+                <button onclick="Shopping.removeFromCart('${item.id}','${item.storeId}')" style="background:#ef4444;color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;">🗑️</button>
+              </div>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    html += `</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:10px;border-top:2px solid var(--p);">
+        <strong style="font-size:1.1rem;">💰 الإجمالي الكلي:</strong>
+        <strong style="font-size:1.2rem;color:var(--primary);">${grandTotal.toLocaleString()} د.ع</strong>
+      </div>
+      <button onclick="Shopping.checkoutMultiStore()" style="width:100%;margin-top:10px;padding:12px;background:linear-gradient(135deg,#10b981,#059669);color:white;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;">
+        ✅ إتمام الشراء من جميع المتاجر - دفع كاش
+      </button>
+      <button onclick="document.getElementById('global-modal')?.classList.add('hidden')" style="width:100%;margin-top:8px;padding:10px;background:#64748b;color:white;border:none;border-radius:8px;cursor:pointer;">متابعة التسوق</button>`;
+
+    showCustomAlert('🛒 سلة المشتريات', html, null, null);
+  },
+
+  // تحديث كمية منتج في السلة
+  updateQty: (itemId, storeId, newQty) => {
+    const qty = parseInt(newQty);
+    if (!qty || qty < 1) return;
+    const item = App.cart.find(i => i.id === itemId && i.storeId === storeId);
+    if (item) {
+      item.qty = qty;
+      Shopping.showFullCart(); // إعادة رسم السلة لتحديث الإجمالي
+    }
+  },
+
+  // حذف عنصر من السلة
+  removeFromCart: (itemId, storeId) => {
+    App.cart = App.cart.filter(i => !(i.id === itemId && i.storeId === storeId));
+    if (App.cart.length === 0) {
+      document.getElementById('global-modal')?.classList.add('hidden');
+      return alert('🗑️ السلة فارغة الآن');
+    }
+    Shopping.showFullCart();
+  },
+
+  // إتمام الشراء: إنشاء طلب منفصل لكل متجر
+  checkoutMultiStore: async () => {
+    if (!App.cart?.length) return;
+    if (!App.userLocation) { await App.checkGPS(); }
+
+    // تجميع العناصر حسب المتجر
+    const grouped = {};
+    App.cart.forEach(item => {
+      if (!grouped[item.storeId]) {
+        grouped[item.storeId] = { items: [], total: 0 };
+      }
+      grouped[item.storeId].items.push(item);
+      grouped[item.storeId].total += item.price * item.qty;
+    });
+
+    const totalAmount = App.cart.reduce((s,i) => s + i.price*i.qty, 0);
+    const storeCount = Object.keys(grouped).length;
+
+    if (!confirm(`✅ تأكيد الطلب من ${storeCount} متجر\n💵 الدفع النقدي عند الاستلام\n💰 الإجمالي: ${totalAmount.toLocaleString()} د.ع`)) return;
+
+    let success = 0;
+    for (const sid in grouped) {
+      const store = grouped[sid];
+      
+      // إنشاء الطلب الرئيسي
+      const {  orderData, error } = await App.db.from('orders').insert({
+        store_id: sid,
+        customer_id: App.user.id,
+        total_price: store.total,
+        payment_method: 'cash',
+        payment_status: 'غير مدفوع',
+        delivery_address: 'عنوان من الخريطة',
+        delivery_lat: App.userLocation?.lat,
+        delivery_lng: App.userLocation?.lng,
+        status: 'جديد'
+      }).select();
+
+      if (error) {
+        alert('❌ فشل إنشاء طلب لـ ' + store.items[0].storeName);
+        continue;
+      }
+
+      const orderId = orderData[0].id;
+
+      // إضافة عناصر الطلب
+      const itemsToInsert = store.items.map(it => ({
+        order_id: orderId,
+        product_id: it.id,
+        product_name: it.name,
+        quantity: it.qty,
+        unit_price: it.price,
+        subtotal: it.price * it.qty
+      }));
+
+      await App.db.from('order_items').insert(itemsToInsert);
+      success++;
+    }
+
+    // تفريغ السلة
+    App.cart = [];
+
+    alert(`✅ تم إرسال ${success} طلب بنجاح!\n💵 الدفع نقداً عند الاستلام`);
+    document.getElementById('global-modal')?.classList.add('hidden');
+    App.router('my-orders');
   }
 };
 
@@ -877,16 +1246,27 @@ const Store = {
 // ==========================================
 const Rating = {
   renderStars: (avg) => { const full=Math.floor(avg), half=avg%1>=0.5; let h=''; for(let i=0;i<5;i++) h+= i<full?'⭐':(i===full&&half?'🌟':'☆'); return h; },
+  
+  openModal: (tripId, revieweeId) => {
+    showCustomAlert('⭐ تقييم الرحلة', `
+      <div style="text-align:center;">
+        <div style="font-size:2rem;margin:10px 0;" id="star-display">☆☆☆☆☆</div>
+        <input type="range" id="rating-value" min="1" max="5" value="5" style="width:100%;" oninput="document.getElementById('star-display').innerText=Rating.renderStars(this.value)">
+        <textarea id="rating-comment" placeholder="تعليقك (اختياري)" rows="3" style="width:100%;margin-top:15px;padding:10px;border:1px solid #ddd;border-radius:8px;"></textarea>
+      </div>
+    `, () => Rating.submit(tripId, revieweeId));
+  },
+  
   submit: async (tripId, revieweeId) => {
-    const rating = parseInt(document.getElementById('rating-value')?.value||'0'), comment = document.getElementById('rating-comment')?.value.trim()||'';
-    if (rating<1) return alert('⚠️ يرجى اختيار عدد النجوم');
+    const rating = parseInt(document.getElementById('rating-value')?.value||'5'), comment = document.getElementById('rating-comment')?.value.trim()||'';
     const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id',tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({ trip_id:tripId, reviewer_id:App.user?.id, reviewee_id:revieweeId, rating, comment:comment||null });
     if (error) return alert('❌ فشل التقييم: '+error.message);
     await Rating.updateAverage(revieweeId);
-    document.getElementById('global-modal')?.classList.add('hidden'); alert('✅ شكراً لتقييمك!');
+    alert('✅ شكراً لتقييمك!');
   },
+  
   updateAverage: async (userId) => {
     const { data } = await App.db.from('reviews').select('rating').eq('reviewee_id',userId);
     if (!data?.length) return;
@@ -935,7 +1315,7 @@ const AboutShira = {
       <div style="font-size:3rem;margin-bottom:10px;">🚀</div><h2 style="margin-bottom:10px;">شراع | Shira Platform</h2>
       <p style="color:var(--text-muted);margin-bottom:20px;">منصتك الذكية للنقل والتوصيل في العراق</p>
       <div style="background:#f8fafc;padding:15px;border-radius:12px;margin-bottom:20px;text-align:right;">
-        <p><strong>📱 الإصدار:</strong> 4.1.1</p><p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
+        <p><strong>📱 الإصدار:</strong> ${CONFIG.APP_VERSION}</p><p><strong>🏢 الشركة:</strong> شراع للخدمات اللوجستية</p>
         <p><strong>📍 المقر:</strong> بغداد، العراق</p><p><strong>📧 الدعم:</strong> support@shira.app</p>
         <p style="color:#16a34a;font-weight:600;">💵 جميع التعاملات: دفع نقدي (كاش)</p>
       </div>
