@@ -17,6 +17,7 @@ const App = {
   userLocation: null,
   destLocation: null,
   subscriptionTimer: null,
+  cart: [],
 
   init: async () => {
     try {
@@ -31,6 +32,53 @@ const App = {
       Utils.hideSkeleton('#app-view');
       alert('حدث خطأ أثناء تحميل التطبيق. يرجى تحديث الصفحة.');
     }
+  },
+
+  ensureDb: () => {
+    if (!App.db) {
+      App.db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
+    }
+  },
+
+  filterStores: () => {
+    const search = document.getElementById('store-search')?.value.toLowerCase() || '';
+    const type = document.getElementById('store-type-filter')?.value || '';
+    document.querySelectorAll('.store-card').forEach(card => {
+      const name = card.dataset.name || '';
+      const cardType = card.dataset.type || '';
+      card.style.display = (name.includes(search) && (!type || cardType === type)) ? '' : 'none';
+    });
+  },
+
+  addToCart: (productId, productName, price) => {
+    const existing = App.cart.find(item => item.id === productId);
+    if (existing) existing.qty++;
+    else App.cart.push({ id: productId, name: productName, price, qty: 1 });
+    const countEl = document.getElementById('cart-count');
+    if (countEl) countEl.innerText = App.cart.reduce((sum, i) => sum + i.qty, 0);
+  },
+
+  showCart: () => {
+    if (App.cart.length === 0) return alert('🛒 السلة فارغة');
+    const total = App.cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const itemsHtml = App.cart.map(i => `
+      <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+        <span>${i.name} × ${i.qty}</span>
+        <strong>${(i.price * i.qty).toLocaleString()} د.ع</strong>
+      </div>`).join('');
+    showCustomAlert('🛒 سلة المشتريات', `${itemsHtml}<div style="margin-top:15px; font-weight:700;">المجموع: ${total.toLocaleString()} د.ع</div>`, 
+      () => { alert('✅ سيتم تطوير إتمام الطلب قريباً'); App.cart = []; if(document.getElementById('cart-count')) document.getElementById('cart-count').innerText = '0'; });
+  },
+
+  toggleProductAvailability: async (productId, currentStatus, storeId) => {
+    if (App.profile?.role !== 'صاحب متجر') return alert('⛔ صلاحية صاحب المتجر فقط');
+    const newStatus = currentStatus === 'متوفر' ? 'منتهي' : 'متوفر';
+    try {
+      App.ensureDb();
+      await App.db.from('products').update({ availability: newStatus }).eq('id', productId);
+      alert(`✅ تم: ${newStatus}`);
+      App.router('store-products', storeId);
+    } catch (err) { alert('❌ فشل: ' + err.message); }
   },
 
   checkGPS: async () => {
@@ -498,12 +546,50 @@ const Views = {
     return Views.dashboard();
   },
   
-  shopping: () => {
-    return `<div class="text-center" style="padding: 40px 20px;">
-      <div style="font-size: 60px; margin-bottom: 20px;">🛒</div>
-      <h2 style="margin-bottom: 15px;">قسم التسوق</h2>
-      <p style="color: var(--text-muted); margin-bottom: 30px;">سيتم عرض المتاجر والمنتجات هنا قريباً</p>
-      <button onclick="App.router('home')" class="btn btn-outline">العودة للرئيسية</button></div>`;
+  shopping: async () => {
+    try {
+      App.ensureDb();
+      const {  stores } = await App.db.from('profiles')
+        .select('id, name, profile_image, store_type, description, store_status')
+        .eq('role', 'صاحب متجر').eq('status', 'نشط');
+      const storesList = stores || [];
+      const types = [...new Set(storesList.map(s => s.store_type).filter(Boolean))];
+      return `
+        <div style="margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap;">
+          <input type="text" id="store-search" placeholder="🔍 ابحث باسم المتجر..." 
+                 style="flex:1; min-width:200px; padding:10px; border:1px solid #ddd; border-radius:10px;"
+                 oninput="App.filterStores()">
+          <select id="store-type-filter" style="padding:10px; border:1px solid #ddd; border-radius:10px;" onchange="App.filterStores()">
+            <option value="">كل الأنواع</option>
+            ${types.map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </div>
+        <div id="stores-container" style="display:grid; gap:12px;">
+          ${storesList.map(store => `
+            <div class="store-card" data-name="${(store.name||'').toLowerCase()}" data-type="${store.store_type||''}" 
+                 style="background:white; border-radius:12px; padding:15px; display:flex; gap:12px; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,0.05);"
+                 onclick="App.router('store-products', '${store.id}')">
+              <img src="${store.profile_image || 'https://ui-avatars.com/api/?name='+encodeURIComponent(store.name)}" 
+                   style="width:60px; height:60px; border-radius:10px; object-fit:cover;">
+              <div style="flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                  <h4 style="margin:0; font-size:15px;">${store.name}</h4>
+                  <span style="background:${store.store_status==='مفتوح'?'#22c55e':'#ef4444'}; color:white; padding:3px 10px; border-radius:20px; font-size:11px;">
+                    ${store.store_status==='مفتوح'?'🟢 مفتوح':'🔴 مغلق'}
+                  </span>
+                </div>
+                <p style="margin:5px 0 0; color:#64748b; font-size:12px;">${store.store_type||''}</p>
+                ${store.description ? `<p style="margin:5px 0 0; color:#94a3b8; font-size:11px;">${store.description.substring(0,50)}...</p>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        ${storesList.length === 0 ? '<p style="text-align:center; color:#64748b; padding:30px;">لا توجد متاجر حالياً</p>' : ''}
+      `;
+    } catch (err) {
+      console.error('Stores load error:', err);
+      return '<div class="text-center mt-2" style="color:var(--red)">❌ فشل تحميل المتاجر</div>';
+    }
   },
   
   dashboard: () => {
@@ -654,23 +740,41 @@ const Views = {
     </div>`;
   },
   
-  storeProducts: () => {
-    return `<div class="text-center" style="padding:40px 20px;">
-      <div style="font-size:60px; margin-bottom:20px;">📦</div>
-      <h2>إدارة المنتجات</h2>
-      <p style="color:var(--text-muted); margin-bottom:30px;">إضافة، تعديل، وحذف المنتجات</p>
-      <button class="btn btn-primary" style="margin-bottom:20px;">➕ إضافة منتج جديد</button>
-      <div class="card" style="margin-bottom:10px; text-align:right;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <strong>منتج مثال</strong>
-            <p style="color:var(--text-muted); font-size:13px; margin:5px 0;">السعر: 5,000 د.ع</p>
-          </div>
-          <span class="badge" style="background:var(--green); color:white; padding:4px 10px; border-radius:20px; font-size:12px;">✅ متوفر</span>
+  storeProducts: async (storeId) => {
+    try {
+      App.ensureDb();
+      const {  store } = await App.db.from('profiles').select('name, store_status').eq('id', storeId).single();
+      const {  products } = await App.db.from('products').select('*').eq('store_id', storeId).order('created_at', { ascending: false });
+      const isClosed = store?.store_status !== 'مفتوح';
+      const isOwner = App.profile?.id === storeId;
+      return `
+        ${isClosed && !isOwner ? `<div style="background:#fee2e2; color:#991b1b; padding:12px; border-radius:10px; margin-bottom:15px; text-align:center;">🔴 هذا المتجر مغلق حالياً</div>` : ''}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+          <h3 style="margin:0;">📦 منتجات ${store?.name || ''}</h3>
+          ${!isOwner ? `<button onclick="App.showCart()" style="padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:10px; cursor:pointer;">🛒 <span id="cart-count">0</span></button>` : ''}
         </div>
-      </div>
-      <button onclick="App.router('dashboard')" class="btn btn-outline">العودة</button>
-    </div>`;
+        <div id="products-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px;">
+          ${(products || []).map(p => `
+            <div style="background:#f8fafc; border-radius:12px; padding:12px; text-align:center; ${p.availability==='منتهي'?'opacity:0.6':''}">
+              <img src="${p.image_url || 'https://via.placeholder.com/150?text=No+Image'}" style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px;">
+              <h4 style="margin:0 0 5px; font-size:14px;">${p.name}</h4>
+              <p style="margin:0 0 8px; color:var(--primary); font-weight:600;">${p.price?.toLocaleString() || 0} د.ع</p>
+              ${isOwner ? `
+                <button onclick="App.toggleProductAvailability('${p.id}', '${p.availability||'متوفر'}', '${storeId}')" 
+                        style="padding:6px 12px; background:${p.availability==='متوفر'?'#22c55e':'#ef4444'}; color:white; border:none; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">
+                  ${p.availability==='متوفر'?'✅ متوفر':'📭 منتهي'}
+                </button>` :
+                (p.availability !== 'منتهي' ? `<button onclick="App.addToCart('${p.id}', '${p.name}', ${p.price})" ${isClosed?'disabled':''} style="padding:6px 12px; background:#22c55e; color:white; border:none; border-radius:8px; cursor:pointer; font-size:12px; width:100%;">${isClosed?'المحل مغلق':'➕ أضف'}</button>` : `<span style="background:#fee2e2; color:#991b1b; padding:4px 10px; border-radius:20px; font-size:11px;">📭 منتهي</span>`)
+              }
+            </div>
+          `).join('')}
+        </div>
+        ${(!products || products.length === 0) ? '<p style="text-align:center; color:#64748b; padding:30px;">لا توجد منتجات</p>' : ''}
+      `;
+    } catch (err) {
+      console.error('Products load error:', err);
+      return '<div class="text-center mt-2" style="color:var(--red)">❌ فشل التحميل</div>';
+    }
   },
   
   deliveryMap: () => {
@@ -859,7 +963,7 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr, data: upData } = await App.db.storage
+        const { error: upErr,  upData } = await App.db.storage
           .from(CONFIG.STORAGE_BUCKETS.avatars)
           .upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
@@ -873,7 +977,7 @@ const Auth = {
     }
     
     // ✅ التصحيح الرئيسي: signUp مع options.data
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
       options: {
@@ -961,7 +1065,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(bikePhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage
+          const { error: upErr,  upData } = await App.db.storage
             .from(CONFIG.STORAGE_BUCKETS.vehicles)
             .upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
@@ -1155,15 +1259,14 @@ const Driver = {
 // ==========================================
 const Store = {
   toggleStatus: async (status) => {
-    if (!App.user?.id) return;
+    if (App.profile?.role !== 'صاحب متجر') return;
     try {
+      App.ensureDb();
       await App.db.from('profiles').update({ store_status: status }).eq('id', App.user.id);
       if (App.profile) App.profile.store_status = status;
       App.router('dashboard');
       alert(status === 'مفتوح' ? '🟢 متجرك مفتوح الآن' : '🔴 تم إغلاق المتجر');
-    } catch (err) {
-      alert('❌ فشل تحديث حالة المتجر: ' + err.message);
-    }
+    } catch (err) { alert('❌ فشل التحديث: ' + err.message); }
   },
   
   fetchNewOrders: async () => {
@@ -1222,8 +1325,8 @@ const Rating = {
     const rating = parseInt(document.getElementById('rating-value')?.value || '0');
     const comment = document.getElementById('rating-comment')?.value.trim() || '';
     if (rating < 1) return alert('⚠️ يرجى اختيار عدد النجوم');
-    // ✅ التصحيح: data: existing
-    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
+    // ✅ التصحيح:  existing
+    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id', tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({
       trip_id: tripId,
