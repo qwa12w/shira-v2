@@ -25,7 +25,7 @@
   }
 })();
 
-// ✅ تعريف CONFIG بأمان - تم التصحيح (يمنع إعادة التصريح)
+// ✅ تعريف CONFIG بأمان تام - الحل النهائي (يمنع خطأ Identifier)
 window.CONFIG = window.CONFIG || window.ShiraConfig;
 if (typeof CONFIG === 'undefined') {
   var CONFIG = window.CONFIG;
