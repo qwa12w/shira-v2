@@ -1,11 +1,9 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v4.1.2
+// شراع | Shira Platform - Core Application Engine v4.1.2 (✅ مصحح)
 // ✅ نسخة جاهزة للإنتاج - جميع التعاملات نقدية (كاش)
-// ✅ التسوق: عرض كل المتاجر والمنتجات + سلة متعددة المتاجر
-// ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
 
-// ⚙️ إعدادات المنصة - ✅ آمنة من إعادة التعريف
+// ⚙️ إعدادات المنصة
 (function() {
   if (typeof window.ShiraConfig === 'undefined') {
     window.ShiraConfig = {
@@ -25,10 +23,15 @@
   }
 })();
 
-// ✅ تعريف CONFIG بأمان تام - الحل النهائي (يمنع خطأ Identifier)
 window.CONFIG = window.CONFIG || window.ShiraConfig;
 if (typeof CONFIG === 'undefined') {
   var CONFIG = window.CONFIG;
+}
+
+// ✅ التحقق من وجود Supabase
+if (typeof window.supabase === 'undefined') {
+  console.error('❌ Supabase library not loaded!');
+  alert('خطأ في تحميل مكتبة Supabase. تأكد من إضافة script المصدر.');
 }
 
 const App = {
@@ -49,6 +52,7 @@ const App = {
   init: async () => {
     try {
       Utils.showSkeleton('#app-view');
+      if (!window.supabase) throw new Error('Supabase not loaded');
       App.db = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY);
       App.setupListeners();
       try { await App.checkGPS(); } catch (e) { console.warn("⚠️ GPS غير متاح."); }
@@ -609,7 +613,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module - ✅ تم تصحيح جميع الأخطاء
+// 🔐 Auth Module
 // ==========================================
 const Auth = {
   login: async () => {
@@ -632,7 +636,7 @@ const Auth = {
     
     const res = await App.db.auth.signInWithPassword({ email: phone + '@shira.app', password: pass });
     if (res.error) return alert('❌ ' + res.error.message);
-    location.reload();
+    window.location.reload();
   },
   
   register: async (role) => {
@@ -660,7 +664,6 @@ const Auth = {
       } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    // ✅ التصحيح النهائي: signUp syntax
     const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
@@ -741,7 +744,7 @@ const Auth = {
 
     const title = role === 'زبون' ? '✅ تم إنشاء حسابك!' : '✅ تم تسجيل طلبك!';
     const message = role === 'زبون' ? 'جاري الدخول...' : 'سيراجعه فريق الإدارة خلال 24 ساعة.';
-    const onConfirm = role === 'زبون' ? () => location.reload() : () => App.router('login');
+    const onConfirm = role === 'زبون' ? () => window.location.reload() : () => App.router('login');
     showCustomAlert(title, message, onConfirm);
   }
 };
@@ -897,6 +900,12 @@ const Driver = {
       const dist = MapUtils.calculateDistance(App.userLocation.lat,App.userLocation.lng,t.pickup_lat,t.pickup_lng).toFixed(1);
       Notifications.show('🚀 طلب جديد!', `مسافة: ${dist} كم - ${t.service_type}\n💵 الدفع: كاش`, 'trip', ()=>Driver.acceptTrip(t.id));
     });
+  },
+  acceptTrip: async (tripId) => {
+    const { error } = await App.db.from('trips').update({ status:'مقبولة', driver_id:App.user.id, accepted_at:new Date().toISOString() }).eq('id',tripId);
+    if (error) { alert('❌ فشل قبول الرحلة: '+error.message); return; }
+    Notifications.show('✅ قبلت الرحلة', 'توجه إلى موقع العميل', 'success');
+    App.router('dashboard');
   }
 };
 
@@ -976,7 +985,7 @@ const Store = {
     if (!p) return;
     showCustomAlert('✏️ تعديل المنتج', `
       <form id="edit-product-form" style="display:grid;gap:10px;">
-        <input type="text" id="prod-name" value="${p.name}" required style="padding:10px;border:1px solid #ddd;border-radius:8px;">
+        <input type="text" id="prod-name" value="${p.name.replace(/"/g, '&quot;')}" required style="padding:10px;border:1px solid #ddd;border-radius:8px;">
         <textarea id="prod-desc" rows="2" style="padding:10px;border:1px solid #ddd;border-radius:8px;">${p.description||''}</textarea>
         <input type="number" id="prod-price" value="${p.price}" required min="0" step="0.01" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
         <input type="text" id="prod-cat" value="${p.category||''}" style="padding:10px;border:1px solid #ddd;border-radius:8px;">
@@ -1000,6 +1009,7 @@ const Store = {
   },
   
   deleteProduct: async (productId) => {
+    // استخدام confirm الأصلي لأن showCustomAlert غير متزامن
     if (!confirm('⚠️ حذف هذا المنتج نهائياً؟')) return;
     const { error } = await App.db.from('products').delete().eq('id', productId);
     if (error) return alert('❌ فشل الحذف: '+error.message);
@@ -1008,7 +1018,7 @@ const Store = {
 };
 
 // ==========================================
-// 🛒 Shopping Module - متعدد المتاجر مع سلة موحدة ✅
+// 🛒 Shopping Module
 // ==========================================
 const Shopping = {
   
@@ -1237,20 +1247,31 @@ const Shopping = {
 // ⭐ Rating Module
 // ==========================================
 const Rating = {
-  renderStars: (avg) => { const full=Math.floor(avg), half=avg%1>=0.5; let h=''; for(let i=0;i<5;i++) h+= i<full?'⭐':(i===full&&half?'🌟':'☆'); return h; },
+  renderStars: (avg) => { 
+    const full = Math.floor(avg); 
+    const half = avg % 1 >= 0.5; 
+    let h = ''; 
+    for(let i = 0; i < 5; i++) { 
+      if (i < full) h += '⭐'; 
+      else if (i === full && half) h += '🌟'; 
+      else h += '☆'; 
+    } 
+    return h; 
+  },
   
   openModal: (tripId, revieweeId) => {
     showCustomAlert('⭐ تقييم الرحلة', `
       <div style="text-align:center;">
         <div style="font-size:2rem;margin:10px 0;" id="star-display">☆☆☆☆☆</div>
-        <input type="range" id="rating-value" min="1" max="5" value="5" style="width:100%;" oninput="document.getElementById('star-display').innerText=Rating.renderStars(this.value)">
+        <input type="range" id="rating-value" min="1" max="5" value="5" style="width:100%;" oninput="document.getElementById('star-display').innerText = Rating.renderStars(this.value)">
         <textarea id="rating-comment" placeholder="تعليقك (اختياري)" rows="3" style="width:100%;margin-top:15px;padding:10px;border:1px solid #ddd;border-radius:8px;"></textarea>
       </div>
     `, () => Rating.submit(tripId, revieweeId));
   },
   
   submit: async (tripId, revieweeId) => {
-    const rating = parseInt(document.getElementById('rating-value')?.value||'5'), comment = document.getElementById('rating-comment')?.value.trim()||'';
+    const rating = parseInt(document.getElementById('rating-value')?.value||'5');
+    const comment = document.getElementById('rating-comment')?.value.trim()||'';
     const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id',tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({ trip_id:tripId, reviewer_id:App.user?.id, reviewee_id:revieweeId, rating, comment:comment||null });
@@ -1321,95 +1342,153 @@ const AboutShira = {
 // 🛠️ Utils Module
 // ==========================================
 const Utils = {
-  compressImage: async (file,maxWidth,quality) => new Promise((resolve)=>{
-    const reader=new FileReader(); reader.readAsDataURL(file);
-    reader.onload=(e)=>{ const img=new Image(); img.src=e.target.result;
-      img.onload=()=>{ const canvas=document.createElement('canvas'); let w=img.width,h=img.height;
-        if (w>maxWidth){ h=(maxWidth/w)*h; w=maxWidth; }
-        canvas.width=w; canvas.height=h; canvas.getContext('2d').drawImage(img,0,0,w,h);
-        canvas.toBlob((blob)=>resolve(blob),'image/jpeg',quality); }; }; }),
-  openWhatsApp: ()=>window.open('https://wa.me/9647722507019','_blank'),
-  openInAppChat: ()=>Messages.openChatModal(),
-  showSkeleton: (sel)=>{ const el=document.querySelector(sel); if (!el) return;
-    el.innerHTML='<div class="skeleton" style="height:20px;width:80%;margin:10px auto;"></div><div class="skeleton" style="height:20px;width:60%;margin:10px auto;"></div><div class="skeleton" style="height:100px;width:100%;margin:10px auto;border-radius:12px;"></div><div class="skeleton" style="height:20px;width:90%;margin:10px auto;"></div>'; },
-  hideSkeleton: ()=>{}
+  compressImage: async (file, maxWidth, quality) => new Promise((resolve)=>{
+    const reader = new FileReader(); 
+    reader.readAsDataURL(file);
+    reader.onload = (e) => { 
+      const img = new Image(); 
+      img.src = e.target.result;
+      img.onload = () => { 
+        const canvas = document.createElement('canvas'); 
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { 
+          h = (maxWidth / w) * h; 
+          w = maxWidth; 
+        }
+        canvas.width = w; 
+        canvas.height = h; 
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality); 
+      }; 
+    };
+  }),
+  openWhatsApp: () => window.open('https://wa.me/9647722507019','_blank'),
+  openInAppChat: () => Messages.openChatModal(),
+  showSkeleton: (sel) => { 
+    const el = document.querySelector(sel); 
+    if (!el) return;
+    el.innerHTML = '<div class="skeleton" style="height:20px;width:80%;margin:10px auto;"></div><div class="skeleton" style="height:20px;width:60%;margin:10px auto;"></div><div class="skeleton" style="height:100px;width:100%;margin:10px auto;border-radius:12px;"></div><div class="skeleton" style="height:20px;width:90%;margin:10px auto;"></div>';
+  },
+  hideSkeleton: (sel) => {
+    const el = document.querySelector(sel);
+    if (el) el.innerHTML = '';
+  }
 };
 
 // ==========================================
 // 🎨 Custom Alert
 // ==========================================
-const showCustomAlert = (title,message,onConfirm,onCancel) => {
-  const hasCancel=typeof onCancel==='function', modal=document.createElement('div');
-  modal.className='custom-alert-overlay'; modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:fadeIn 0.3s ease;';
-  modal.innerHTML=`<div style="background:white;border-radius:20px;padding:30px 25px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:slideUp 0.4s ease;">
-    <div style="width:70px;height:70px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:35px;">${hasCancel?'⚠️':'✅'}</div>
+const showCustomAlert = (title, message, onConfirm, onCancel) => {
+  const hasCancel = typeof onCancel === 'function';
+  const modal = document.createElement('div');
+  modal.className = 'custom-alert-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:10000;padding:20px;animation:fadeIn 0.3s ease;';
+  modal.innerHTML = `<div style="background:white;border-radius:20px;padding:30px 25px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:slideUp 0.4s ease;">
+    <div style="width:70px;height:70px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:35px;">${hasCancel ? '⚠️' : '✅'}</div>
     <h3 style="margin:0 0 10px;color:#1e293b;font-size:22px;font-weight:700;">${title}</h3>
     <p style="margin:0 0 25px;color:#64748b;font-size:15px;line-height:1.6;white-space:pre-line;">${message}</p>
-    <div style="display:grid;grid-template-columns:${hasCancel?'1fr 1fr':'1fr'};gap:10px;">
-      <button onclick="this.closest('.custom-alert-overlay').remove();${onConfirm?'onConfirm()':''}" style="padding:14px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">${hasCancel?'حسنًا':'إغلاق'}</button>
-      ${hasCancel?`<button onclick="this.closest('.custom-alert-overlay').remove();if(typeof onCancel==='function')onCancel()" style="padding:14px;background:#e2e8f0;color:#475569;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">إلغاء</button>`:''}
+    <div style="display:grid;grid-template-columns:${hasCancel ? '1fr 1fr' : '1fr'};gap:10px;">
+      <button onclick="this.closest('.custom-alert-overlay').remove();${onConfirm ? 'onConfirm()' : ''}" style="padding:14px;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">${hasCancel ? 'حسنًا' : 'إغلاق'}</button>
+      ${hasCancel ? `<button onclick="this.closest('.custom-alert-overlay').remove();if(typeof onCancel==='function')onCancel()" style="padding:14px;background:#e2e8f0;color:#475569;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">إلغاء</button>` : ''}
     </div></div>`;
   document.body.appendChild(modal);
-  const style=document.createElement('style'); style.textContent='@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(50px);opacity:0}to{transform:translateY(0);opacity:1}}';
+  const style = document.createElement('style');
+  style.textContent = '@keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes slideUp{from{transform:translateY(50px);opacity:0}to{transform:translateY(0);opacity:1}}';
   document.head.appendChild(style);
 };
-
-// ==========================================
-// 🎨 Override Browser Alerts
-// ==========================================
-window.alert = (msg)=>showCustomAlert('تنبيه',msg,null);
-window.confirm = (msg)=>new Promise((res)=>showCustomAlert('تأكيد',msg,()=>res(true),()=>res(false)));
 
 // ==========================================
 // 🔔 Notifications Module
 // ==========================================
 const Notifications = {
-  audioCtx:null, toastContainer:null, enabled:true,
-  init: ()=>{
-    try{ Notifications.audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){console.warn('🔇 Web Audio غير مدعوم');}
-    if (!document.getElementById('toast-container')){
-      Notifications.toastContainer=document.createElement('div'); Notifications.toastContainer.id='toast-container';
-      Notifications.toastContainer.style.cssText='position:fixed;top:80px;right:20px;z-index:10001;display:flex;flex-direction:column;gap:10px;max-width:320px;pointer-events:none;';
+  audioCtx: null, toastContainer: null, enabled: true,
+  init: () => {
+    try { Notifications.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { console.warn('🔇 Web Audio غير مدعوم'); }
+    if (!document.getElementById('toast-container')) {
+      Notifications.toastContainer = document.createElement('div');
+      Notifications.toastContainer.id = 'toast-container';
+      Notifications.toastContainer.style.cssText = 'position:fixed;top:80px;right:20px;z-index:10001;display:flex;flex-direction:column;gap:10px;max-width:320px;pointer-events:none;';
       document.body.appendChild(Notifications.toastContainer);
-    } else Notifications.toastContainer=document.getElementById('toast-container');
-    const saved=localStorage.getItem('notifications_enabled'); if (saved!==null) Notifications.enabled=saved==='true';
-    if ('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+    } else {
+      Notifications.toastContainer = document.getElementById('toast-container');
+    }
+    const saved = localStorage.getItem('notifications_enabled');
+    if (saved !== null) Notifications.enabled = saved === 'true';
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
   },
-  playTone: ()=>{
-    if (!Notifications.enabled||!Notifications.audioCtx) return;
-    try{ if (Notifications.audioCtx.state==='suspended') Notifications.audioCtx.resume();
-      const osc=Notifications.audioCtx.createOscillator(), gain=Notifications.audioCtx.createGain();
-      osc.connect(gain); gain.connect(Notifications.audioCtx.destination); osc.type='sine';
-      osc.frequency.setValueAtTime(880,Notifications.audioCtx.currentTime); osc.frequency.setValueAtTime(1100,Notifications.audioCtx.currentTime+0.08);
-      gain.gain.setValueAtTime(0.4,Notifications.audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01,Notifications.audioCtx.currentTime+0.25);
-      osc.start(); osc.stop(Notifications.audioCtx.currentTime+0.25); }catch(e){}
+  playTone: () => {
+    if (!Notifications.enabled || !Notifications.audioCtx) return;
+    try {
+      if (Notifications.audioCtx.state === 'suspended') Notifications.audioCtx.resume();
+      const osc = Notifications.audioCtx.createOscillator();
+      const gain = Notifications.audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(Notifications.audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, Notifications.audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1100, Notifications.audioCtx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.4, Notifications.audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, Notifications.audioCtx.currentTime + 0.25);
+      osc.start();
+      osc.stop(Notifications.audioCtx.currentTime + 0.25);
+    } catch(e) {}
   },
-  show: (title,message,type='info',onClick=null)=>{
-    if (!Notifications.enabled) return; Notifications.playTone(); Notifications.showToast(title,message,type,onClick);
-    if ('Notification' in window && Notification.permission==='granted') new Notification(title,{body:message,icon:'/icon-192.png',badge:'/icon-192.png',tag:`shira-${Date.now()}`,requireInteraction:true});
+  show: (title, message, type = 'info', onClick = null) => {
+    if (!Notifications.enabled) return;
+    Notifications.playTone();
+    Notifications.showToast(title, message, type, onClick);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body: message, icon: '/icon-192.png', badge: '/icon-192.png', tag: `shira-${Date.now()}`, requireInteraction: true });
+    }
   },
-  showToast: (title,message,type,onClick)=>{
-    const colors={info:{bg:'#3b82f6',icon:'🔔'},success:{bg:'#22c55e',icon:'✅'},warning:{bg:'#f59e0b',icon:'⚠️'},error:{bg:'#ef4444',icon:'❌'},trip:{bg:'#8b5cf6',icon:'🚗'},order:{bg:'#ec4899',icon:'📦'}};
-    const style=colors[type]||colors.info, toast=document.createElement('div'); toast.className='notification-toast';
-    toast.style.cssText=`background:white;border-radius:12px;padding:15px;box-shadow:0 10px 40px rgba(0,0,0,0.2);border-right:4px solid ${style.bg};display:flex;align-items:flex-start;gap:12px;animation:slideIn 0.3s ease;pointer-events:auto;cursor:${onClick?'pointer':'default'};`;
-    toast.innerHTML=`<div style="font-size:24px;flex-shrink:0;">${style.icon}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;color:#1e293b;margin-bottom:4px;">${title}</div><div style="font-size:14px;color:#64748b;line-height:1.4;">${message}</div></div><button onclick="this.closest('.notification-toast').remove()" style="background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>`;
-    if (onClick) toast.onclick=(e)=>{if (!e.target.closest('button')){toast.remove();onClick();}};
-    Notifications.toastContainer.appendChild(toast); setTimeout(()=>{toast.style.animation='slideOut 0.3s ease';setTimeout(()=>toast.remove(),300);},8000);
+  showToast: (title, message, type, onClick) => {
+    const colors = { info: { bg: '#3b82f6', icon: '🔔' }, success: { bg: '#22c55e', icon: '✅' }, warning: { bg: '#f59e0b', icon: '⚠️' }, error: { bg: '#ef4444', icon: '❌' }, trip: { bg: '#8b5cf6', icon: '🚗' }, order: { bg: '#ec4899', icon: '📦' } };
+    const style = colors[type] || colors.info;
+    const toast = document.createElement('div');
+    toast.className = 'notification-toast';
+    toast.style.cssText = `background:white;border-radius:12px;padding:15px;box-shadow:0 10px 40px rgba(0,0,0,0.2);border-right:4px solid ${style.bg};display:flex;align-items:flex-start;gap:12px;animation:slideIn 0.3s ease;pointer-events:auto;cursor:${onClick ? 'pointer' : 'default'};`;
+    toast.innerHTML = `<div style="font-size:24px;flex-shrink:0;">${style.icon}</div><div style="flex:1;min-width:0;"><div style="font-weight:600;color:#1e293b;margin-bottom:4px;">${title}</div><div style="font-size:14px;color:#64748b;line-height:1.4;">${message}</div></div><button onclick="this.closest('.notification-toast').remove()" style="background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;">&times;</button>`;
+    if (onClick) {
+      toast.onclick = (e) => { if (!e.target.closest('button')) { toast.remove(); onClick(); } };
+    }
+    Notifications.toastContainer.appendChild(toast);
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 8000);
   },
-  toggle: ()=>{ Notifications.enabled=!Notifications.enabled; localStorage.setItem('notifications_enabled',Notifications.enabled); return Notifications.enabled; },
-  subscribeToUpdates: ()=>{
+  toggle: () => { Notifications.enabled = !Notifications.enabled; localStorage.setItem('notifications_enabled', Notifications.enabled); return Notifications.enabled; },
+  subscribeToUpdates: () => {
     if (!App.user?.id) return;
-    App.db.channel('messages').on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`receiver_id=eq.${App.user.id}`},(p)=>{if (p.new.sender_id!==App.user.id) Notifications.show('💬 رسالة جديدة','لديك رسالة جديدة من الإدارة','info',()=>App.router('profile'));}).subscribe();
-    if (['سائق تكسي','سائق توك توك','دلفري'].includes(App.profile?.role)) App.db.channel('trips').on('postgres_changes',{event:'INSERT',schema:'public',table:'trips',filter:'status=eq.قيد الانتظار'},()=>Notifications.show('🚀 طلب جديد!','اضغط لعرض تفاصيل الطلب 💵 كاش','trip',()=>App.router('dashboard'))).subscribe();
-    if (App.profile?.role==='صاحب متجر') App.db.channel('orders').on('postgres_changes',{event:'INSERT',schema:'public',table:'orders',filter:`store_id=eq.${App.user.id}`},()=>Notifications.show('📦 طلب جديد في متجرك!','اضغط لمراجعة الطلب 💵 دفع عند الاستلام','order',()=>App.router('dashboard'))).subscribe();
+    App.db.channel('messages').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${App.user.id}` }, (p) => {
+      if (p.new.sender_id !== App.user.id) Notifications.show('💬 رسالة جديدة', 'لديك رسالة جديدة من الإدارة', 'info', () => App.router('profile'));
+    }).subscribe();
+    if (App.profile && ['سائق تكسي', 'سائق توك توك', 'دلفري'].includes(App.profile.role)) {
+      App.db.channel('trips').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'trips', filter: 'status=eq.قيد الانتظار' }, () => {
+        Notifications.show('🚀 طلب جديد!', 'اضغط لعرض تفاصيل الطلب 💵 كاش', 'trip', () => App.router('dashboard'));
+      }).subscribe();
+    }
+    if (App.profile && App.profile.role === 'صاحب متجر') {
+      App.db.channel('orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${App.user.id}` }, () => {
+        Notifications.show('📦 طلب جديد في متجرك!', 'اضغط لمراجعة الطلب 💵 دفع عند الاستلام', 'order', () => App.router('dashboard'));
+      }).subscribe();
+    }
   }
 };
 
 // ✅ Animations
-if (!document.getElementById('notif-anim-style')){const s=document.createElement('style');s.id='notif-anim-style';s.textContent='@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100px);opacity:0}}';document.head.appendChild(s);}
+if (!document.getElementById('notif-anim-style')) {
+  const s = document.createElement('style');
+  s.id = 'notif-anim-style';
+  s.textContent = '@keyframes slideIn{from{transform:translateX(100px);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOut{from{transform:translateX(0);opacity:1}to{transform:translateX(100px);opacity:0}}';
+  document.head.appendChild(s);
+}
 
 // ==========================================
 // 🚀 Final Init
 // ==========================================
-if (document.readyState==='loading'){document.addEventListener('DOMContentLoaded',()=>{App.init();if (App.user){Notifications.init();Notifications.subscribeToUpdates();}});}
-else {App.init();if (App.user){Notifications.init();Notifications.subscribeToUpdates();}}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { App.init(); if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); } });
+} else {
+  App.init(); if (App.user) { Notifications.init(); Notifications.subscribeToUpdates(); }
+}
