@@ -1,9 +1,9 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v4.1.2 (✅ مصحح نهائي)
+// شراع | Shira Platform - Core Application Engine v4.1.2
 // ✅ نسخة جاهزة للإنتاج - جميع التعاملات نقدية (كاش)
 // ==========================================
 
-// ⚙️ إعدادات المنصة
+// ⚙️ إعدادات المنصة - منع إعادة التعريف
 (function() {
   if (typeof window.ShiraConfig === 'undefined') {
     window.ShiraConfig = {
@@ -11,7 +11,7 @@
       SUPABASE_KEY: 'YOUR_ANON_KEY',
       STORAGE_BUCKETS: {
         avatars: 'avatars',
-        vehicles: 'vehicles', 
+        vehicles: 'vehicles',
         products: 'products',
         stores: 'stores'
       },
@@ -23,15 +23,16 @@
   }
 })();
 
-window.CONFIG = window.CONFIG || window.ShiraConfig;
-if (typeof CONFIG === 'undefined') {
-  var CONFIG = window.CONFIG;
+// ✅ استخدام CONFIG من window فقط إذا لم يكن معرفاً
+if (typeof window.CONFIG === 'undefined') {
+  window.CONFIG = window.ShiraConfig;
 }
+
+const CONFIG = window.CONFIG;
 
 // ✅ التحقق من وجود Supabase
 if (typeof window.supabase === 'undefined') {
   console.error('❌ Supabase library not loaded!');
-  alert('خطأ في تحميل مكتبة Supabase. تأكد من إضافة script المصدر.');
 }
 
 const App = {
@@ -155,12 +156,9 @@ const App = {
     const container = document.getElementById('app-container');
     if (gate) {
       gate.classList.remove('hidden');
-      const iconEl = document.getElementById('status-icon');
-      const titleEl = document.getElementById('status-title');
-      const msgEl = document.getElementById('status-msg');
-      if (iconEl) iconEl.innerText = icon;
-      if (titleEl) titleEl.innerText = title;
-      if (msgEl) msgEl.innerText = msg;
+      document.getElementById('status-icon').innerText = icon;
+      document.getElementById('status-title').innerText = title;
+      document.getElementById('status-msg').innerText = msg;
     }
     if (container) container.classList.add('hidden');
   },
@@ -259,26 +257,14 @@ const App = {
         case 'home': container.innerHTML = Views.home(); if (headerTitle) headerTitle.innerText = 'الرئيسية'; break;
         case 'dashboard': container.innerHTML = Views.dashboard(); if (headerTitle) headerTitle.innerText = 'لوحة التحكم'; break;
         case 'request-ride': container.innerHTML = Views.requestRide(payload); if (headerTitle) headerTitle.innerText = 'طلب رحلة'; break;
-        case 'shopping': 
-          container.innerHTML = Views.shopping(); 
+        case 'shopping':
+          container.innerHTML = Views.shopping();
           if (headerTitle) headerTitle.innerText = 'التسوق';
           setTimeout(() => Shopping.loadStores(), 100);
           break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
-        case 'my-orders': 
-          (async () => {
-            container.innerHTML = await Views.myOrders();
-            Utils.hideSkeleton('#app-view');
-          })();
-          if (headerTitle) headerTitle.innerText = 'طلباتي';
-          return;
-        case 'store-products': 
-          (async () => {
-            container.innerHTML = await Views.storeProducts();
-            Utils.hideSkeleton('#app-view');
-          })();
-          if (headerTitle) headerTitle.innerText = 'إدارة المنتجات';
-          return;
+        case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
+        case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
         case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
@@ -1035,7 +1021,6 @@ const Store = {
 // 🛒 Shopping Module
 // ==========================================
 const Shopping = {
-  
   loadStores: async () => {
     const container = document.getElementById('stores-list');
     if (!container) return;
@@ -1261,16 +1246,16 @@ const Shopping = {
 // ⭐ Rating Module
 // ==========================================
 const Rating = {
-  renderStars: (avg) => { 
-    const full = Math.floor(avg); 
-    const half = avg % 1 >= 0.5; 
-    let h = ''; 
-    for(let i = 0; i < 5; i++) { 
-      if (i < full) h += '⭐'; 
-      else if (i === full && half) h += '🌟'; 
-      else h += '☆'; 
-    } 
-    return h; 
+  renderStars: (avg) => {
+    const full = Math.floor(avg);
+    const half = avg % 1 >= 0.5;
+    let h = '';
+    for(let i = 0; i < 5; i++) {
+      if (i < full) h += '⭐';
+      else if (i === full && half) h += '🌟';
+      else h += '☆';
+    }
+    return h;
   },
   
   openModal: (tripId, revieweeId) => {
@@ -1357,29 +1342,29 @@ const AboutShira = {
 // ==========================================
 const Utils = {
   compressImage: async (file, maxWidth, quality) => new Promise((resolve)=>{
-    const reader = new FileReader(); 
+    const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = (e) => { 
-      const img = new Image(); 
+    reader.onload = (e) => {
+      const img = new Image();
       img.src = e.target.result;
-      img.onload = () => { 
-        const canvas = document.createElement('canvas'); 
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
         let w = img.width, h = img.height;
-        if (w > maxWidth) { 
-          h = (maxWidth / w) * h; 
-          w = maxWidth; 
+        if (w > maxWidth) {
+          h = (maxWidth / w) * h;
+          w = maxWidth;
         }
-        canvas.width = w; 
-        canvas.height = h; 
+        canvas.width = w;
+        canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality); 
-      }; 
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+      };
     };
   }),
   openWhatsApp: () => window.open('https://wa.me/9647722507019','_blank'),
   openInAppChat: () => Messages.openChatModal(),
-  showSkeleton: (sel) => { 
-    const el = document.querySelector(sel); 
+  showSkeleton: (sel) => {
+    const el = document.querySelector(sel);
     if (!el) return;
     el.innerHTML = '<div class="skeleton" style="height:20px;width:80%;margin:10px auto;"></div><div class="skeleton" style="height:20px;width:60%;margin:10px auto;"></div><div class="skeleton" style="height:100px;width:100%;margin:10px auto;border-radius:12px;"></div><div class="skeleton" style="height:20px;width:90%;margin:10px auto;"></div>';
   },
