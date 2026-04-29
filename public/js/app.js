@@ -25,9 +25,11 @@
   }
 })();
 
-// ✅ تعريف CONFIG بأمان - تم التصحيح
+// ✅ تعريف CONFIG بأمان - تم التصحيح (يمنع إعادة التصريح)
 window.CONFIG = window.CONFIG || window.ShiraConfig;
-const CONFIG = window.CONFIG;
+if (typeof CONFIG === 'undefined') {
+  var CONFIG = window.CONFIG;
+}
 
 const App = {
   db: null,
