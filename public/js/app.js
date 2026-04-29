@@ -5,21 +5,24 @@
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
 
-// ⚙️ إعدادات المنصة (ضروري للنشر)
-const CONFIG = {
-  SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
-  SUPABASE_KEY: 'YOUR_ANON_KEY',
-  STORAGE_BUCKETS: {
-    avatars: 'avatars',
-    vehicles: 'vehicles', 
-    products: 'products',
-    stores: 'stores'
-  },
-  MAP_CENTER: [33.3152, 44.3661], // بغداد
-  ADMIN_USER_ID: 'admin-uuid-here',
-  APP_VERSION: '4.1.2',
-  CASH_ONLY: true // ✅ جميع التعاملات نقدية
-};
+// ⚙️ إعدادات المنصة (ضروري للنشر) - ✅ تم منع إعادة التعريف
+if (typeof window.ShiraConfig === 'undefined') {
+  window.ShiraConfig = {
+    SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
+    SUPABASE_KEY: 'YOUR_ANON_KEY',
+    STORAGE_BUCKETS: {
+      avatars: 'avatars',
+      vehicles: 'vehicles', 
+      products: 'products',
+      stores: 'stores'
+    },
+    MAP_CENTER: [33.3152, 44.3661],
+    ADMIN_USER_ID: 'admin-uuid-here',
+    APP_VERSION: '4.1.2',
+    CASH_ONLY: true
+  };
+}
+const CONFIG = window.ShiraConfig;
 
 const App = {
   db: null,
@@ -34,7 +37,7 @@ const App = {
   userLocation: null,
   destLocation: null,
   subscriptionTimer: null,
-  cart: [], // 🛒 سلة متعددة المتاجر: [{storeId, storeName, id, name, price, qty}]
+  cart: [],
 
   init: async () => {
     try {
@@ -245,7 +248,7 @@ const App = {
         case 'shopping': 
           container.innerHTML = Views.shopping(); 
           if (headerTitle) headerTitle.innerText = 'التسوق';
-          setTimeout(() => Shopping.loadStores(), 100); // ✅ تحميل المتاجر بعد رسم الواجهة
+          setTimeout(() => Shopping.loadStores(), 100);
           break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
         case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
@@ -264,7 +267,6 @@ const App = {
     if (route === 'delivery-map') {
       setTimeout(() => MapUtils.initHeatMap(), 100);
     }
-    // ✅ shopping يتم تحميله في الـ switch أعلاه
   },
 
   setupListeners: () => {
@@ -406,7 +408,6 @@ const Views = {
     return Views.dashboard();
   },
   
-  // ✅ مكتمل: قسم التسوق - واجهة فقط (التحميل عبر Shopping.loadStores)
   shopping: () => {
     return `<div style="margin-bottom:15px;">
               <input type="text" id="store-search" placeholder="🔍 ابحث عن متجر..." class="input-field" onkeyup="Shopping.searchStores()">
@@ -417,7 +418,6 @@ const Views = {
             <button onclick="App.router('home')" class="btn btn-outline mt-2">العودة</button>`;
   },
   
-  // ✅ مكتمل: سجل الطلبات
   myOrders: async () => {
     const [trips, orders] = await Promise.all([
       App.db.from('trips').select('*,driver:driver_id(name,phone)').eq('customer_id', App.user.id).order('created_at',{ascending:false}).limit(20),
@@ -441,7 +441,6 @@ const Views = {
     <button onclick="App.router('home')" class="btn btn-outline mt-2">العودة</button>`;
   },
   
-  // ✅ مكتمل: إدارة المنتجات (لصاحب المتجر)
   storeProducts: async () => {
     if (!App.user?.id) return Views.dashboard();
     const { data: products } = await App.db.from('products').select('*').eq('store_id', App.user.id).order('created_at',{ascending:false});
@@ -603,7 +602,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module
+// 🔐 Auth Module - ✅ تم تصحيح الأخطاء النحوية
 // ==========================================
 const Auth = {
   login: async () => {
@@ -647,18 +646,18 @@ const Auth = {
       try {
         const compressed = await Utils.compressImage(photoFile, 600, 0.8);
         const fileName = 'avatars/' + Date.now() + '_' + phone + '.jpg';
-        const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
+        const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).upload(fileName, compressed, { upsert: true });
         if (!upErr && upData?.path) {
           photoUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.avatars).getPublicUrl(upData.path).data.publicUrl;
         }
       } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    // ✅ تم إصلاح الخطأ النحوي هنا:
-    const { data: authData, error: authErr } = await App.db.auth.signUp({
+    // ✅ تم تصحيح الخطأ النحوي هنا:
+    const {  authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
-      options: { data: { name, phone, role, gender, age: parseInt(age) } }
+      options: {  { name, phone, role, gender, age: parseInt(age) } }
     });
     
     if (authErr) return alert('❌ ' + authErr.message);
@@ -679,7 +678,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(carPhotos[i], 1000, 0.85);
           const fileName = 'vehicles/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
+          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             carPhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.vehicles).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -696,7 +695,7 @@ const Auth = {
         try {
           const compressed = await Utils.compressImage(storePhotos[i], 1000, 0.85);
           const fileName = 'stores/' + userId + '_' + Date.now() + '_' + i + '.jpg';
-          const { error: upErr, data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+          const { error: upErr,  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
           if (!upErr && upData?.path) {
             storePhotoUrls.push(App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl);
           }
@@ -951,7 +950,7 @@ const Store = {
       if (file) {
         const compressed = await Utils.compressImage(file, 800, 0.85);
         const fileName = `products/${App.user.id}/${Date.now()}.jpg`;
-        const { data: upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
+        const {  upData } = await App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).upload(fileName, compressed, { upsert: true });
         if (upData?.path) imageUrl = App.db.storage.from(CONFIG.STORAGE_BUCKETS.products).getPublicUrl(upData.path).data.publicUrl;
       }
       
@@ -966,7 +965,7 @@ const Store = {
   },
   
   editProduct: async (productId) => {
-    const { data: p } = await App.db.from('products').select('*').eq('id', productId).single();
+    const {  p } = await App.db.from('products').select('*').eq('id', productId).single();
     if (!p) return;
     showCustomAlert('✏️ تعديل المنتج', `
       <form id="edit-product-form" style="display:grid;gap:10px;">
@@ -1006,21 +1005,18 @@ const Store = {
 // ==========================================
 const Shopping = {
   
-  // تحميل وعرض المتاجر: جميعها ظاهرة، المفتوحة أولاً ثم المغلقة، مرتبة بالتقييم
   loadStores: async () => {
     const container = document.getElementById('stores-list');
     if (!container) return;
     if (!App.userLocation) { await App.checkGPS(); }
     
-    // ✅ جلب جميع المتاجر النشطة (بدون فلترة store_status)
-    const { data: stores, error } = await App.db.from('profiles')
+    const {  stores, error } = await App.db.from('profiles')
       .select('id,name,profile_image,store_type,store_status,avg_rating')
       .eq('role', 'صاحب متجر')
       .eq('status', 'نشط');
 
     if (error || !stores) { container.innerHTML = '<p style="text-align:center;color:red;">❌ فشل تحميل المتاجر</p>'; return; }
 
-    // ✅ ترتيب: المفتوحة أولاً ➜ ثم المغلقة، وكل مجموعة مرتبة حسب التقييم (الأعلى أولاً)
     stores.sort((a, b) => {
       const openA = a.store_status === 'مفتوح';
       const openB = b.store_status === 'مفتوح';
@@ -1060,9 +1056,7 @@ const Shopping = {
     });
   },
 
-  // فتح المتجر وعرض منتجاته (جميعها ظاهرة)
   openStore: async (storeId, storeName) => {
-    // جلب جميع المنتجات (بدون فلترة الحالة)
     const { data: products } = await App.db.from('products')
       .select('*')
       .eq('store_id', storeId);
@@ -1092,7 +1086,6 @@ const Shopping = {
     `, null, null);
   },
 
-  // إضافة منتج للسلة متعددة المتاجر
   addToCart: (storeId, storeName, id, name, price) => {
     if (!App.cart) App.cart = [];
     const item = App.cart.find(i => i.id === id && i.storeId === storeId);
@@ -1104,11 +1097,9 @@ const Shopping = {
     Notifications.show('✅ تمت الإضافة', name, 'success');
   },
 
-  // عرض السلة الكاملة مجمعة حسب المتجر مع خيارات التعديل والحذف
   showFullCart: () => {
     if (!App.cart?.length) return alert('🛒 السلة فارغة');
 
-    // تجميع العناصر حسب المتجر
     const grouped = {};
     App.cart.forEach(item => {
       if (!grouped[item.storeId]) {
@@ -1154,18 +1145,16 @@ const Shopping = {
     showCustomAlert('🛒 سلة المشتريات', html, null, null);
   },
 
-  // تحديث كمية منتج في السلة
   updateQty: (itemId, storeId, newQty) => {
     const qty = parseInt(newQty);
     if (!qty || qty < 1) return;
     const item = App.cart.find(i => i.id === itemId && i.storeId === storeId);
     if (item) {
       item.qty = qty;
-      Shopping.showFullCart(); // إعادة رسم السلة لتحديث الإجمالي
+      Shopping.showFullCart();
     }
   },
 
-  // حذف عنصر من السلة
   removeFromCart: (itemId, storeId) => {
     App.cart = App.cart.filter(i => !(i.id === itemId && i.storeId === storeId));
     if (App.cart.length === 0) {
@@ -1175,12 +1164,10 @@ const Shopping = {
     Shopping.showFullCart();
   },
 
-  // إتمام الشراء: إنشاء طلب منفصل لكل متجر
   checkoutMultiStore: async () => {
     if (!App.cart?.length) return;
     if (!App.userLocation) { await App.checkGPS(); }
 
-    // تجميع العناصر حسب المتجر
     const grouped = {};
     App.cart.forEach(item => {
       if (!grouped[item.storeId]) {
@@ -1199,8 +1186,7 @@ const Shopping = {
     for (const sid in grouped) {
       const store = grouped[sid];
       
-      // إنشاء الطلب الرئيسي
-      const { data: orderData, error } = await App.db.from('orders').insert({
+      const {  orderData, error } = await App.db.from('orders').insert({
         store_id: sid,
         customer_id: App.user.id,
         total_price: store.total,
@@ -1219,7 +1205,6 @@ const Shopping = {
 
       const orderId = orderData[0].id;
 
-      // إضافة عناصر الطلب
       const itemsToInsert = store.items.map(it => ({
         order_id: orderId,
         product_id: it.id,
@@ -1233,7 +1218,6 @@ const Shopping = {
       success++;
     }
 
-    // تفريغ السلة
     App.cart = [];
 
     alert(`✅ تم إرسال ${success} طلب بنجاح!\n💵 الدفع نقداً عند الاستلام`);
@@ -1260,7 +1244,7 @@ const Rating = {
   
   submit: async (tripId, revieweeId) => {
     const rating = parseInt(document.getElementById('rating-value')?.value||'5'), comment = document.getElementById('rating-comment')?.value.trim()||'';
-    const { data: existing } = await App.db.from('reviews').select('id').eq('trip_id',tripId).single();
+    const {  existing } = await App.db.from('reviews').select('id').eq('trip_id',tripId).single();
     if (existing) return alert('✅ لقد قيّمت هذه الرحلة مسبقاً');
     const { error } = await App.db.from('reviews').insert({ trip_id:tripId, reviewer_id:App.user?.id, reviewee_id:revieweeId, rating, comment:comment||null });
     if (error) return alert('❌ فشل التقييم: '+error.message);
