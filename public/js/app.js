@@ -1,5 +1,5 @@
 // ==========================================
-// شراع | Shira Platform - Core Application Engine v4.1.2 (✅ مصحح)
+// شراع | Shira Platform - Core Application Engine v4.1.2 (✅ مصحح نهائي)
 // ✅ نسخة جاهزة للإنتاج - جميع التعاملات نقدية (كاش)
 // ==========================================
 
@@ -155,9 +155,12 @@ const App = {
     const container = document.getElementById('app-container');
     if (gate) {
       gate.classList.remove('hidden');
-      document.getElementById('status-icon').innerText = icon;
-      document.getElementById('status-title').innerText = title;
-      document.getElementById('status-msg').innerText = msg;
+      const iconEl = document.getElementById('status-icon');
+      const titleEl = document.getElementById('status-title');
+      const msgEl = document.getElementById('status-msg');
+      if (iconEl) iconEl.innerText = icon;
+      if (titleEl) titleEl.innerText = title;
+      if (msgEl) msgEl.innerText = msg;
     }
     if (container) container.classList.add('hidden');
   },
@@ -262,8 +265,20 @@ const App = {
           setTimeout(() => Shopping.loadStores(), 100);
           break;
         case 'profile': container.innerHTML = Views.profile(); if (headerTitle) headerTitle.innerText = 'الملف الشخصي'; break;
-        case 'my-orders': container.innerHTML = Views.myOrders(); if (headerTitle) headerTitle.innerText = 'طلباتي'; break;
-        case 'store-products': container.innerHTML = Views.storeProducts(); if (headerTitle) headerTitle.innerText = 'إدارة المنتجات'; break;
+        case 'my-orders': 
+          (async () => {
+            container.innerHTML = await Views.myOrders();
+            Utils.hideSkeleton('#app-view');
+          })();
+          if (headerTitle) headerTitle.innerText = 'طلباتي';
+          return;
+        case 'store-products': 
+          (async () => {
+            container.innerHTML = await Views.storeProducts();
+            Utils.hideSkeleton('#app-view');
+          })();
+          if (headerTitle) headerTitle.innerText = 'إدارة المنتجات';
+          return;
         case 'delivery-map': container.innerHTML = Views.deliveryMap(); if (headerTitle) headerTitle.innerText = 'خريطة التوصيل'; break;
         default: container.innerHTML = '<div class="text-center mt-2">قيد التطوير</div>';
       }
@@ -1009,7 +1024,6 @@ const Store = {
   },
   
   deleteProduct: async (productId) => {
-    // استخدام confirm الأصلي لأن showCustomAlert غير متزامن
     if (!confirm('⚠️ حذف هذا المنتج نهائياً؟')) return;
     const { error } = await App.db.from('products').delete().eq('id', productId);
     if (error) return alert('❌ فشل الحذف: '+error.message);
