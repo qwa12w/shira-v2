@@ -5,23 +5,27 @@
 // ⚠️ ملاحظة: السائقون يستلمون طلبات تلقائياً، المتاجر تتحكم يدوياً
 // ==========================================
 
-// ⚙️ إعدادات المنصة (ضروري للنشر) - ✅ تم منع إعادة التعريف
-if (typeof window.ShiraConfig === 'undefined') {
-  window.ShiraConfig = {
-    SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
-    SUPABASE_KEY: 'YOUR_ANON_KEY',
-    STORAGE_BUCKETS: {
-      avatars: 'avatars',
-      vehicles: 'vehicles', 
-      products: 'products',
-      stores: 'stores'
-    },
-    MAP_CENTER: [33.3152, 44.3661],
-    ADMIN_USER_ID: 'admin-uuid-here',
-    APP_VERSION: '4.1.2',
-    CASH_ONLY: true
-  };
-}
+// ⚙️ إعدادات المنصة - ✅ آمنة من إعادة التعريف
+(function() {
+  if (typeof window.ShiraConfig === 'undefined') {
+    window.ShiraConfig = {
+      SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
+      SUPABASE_KEY: 'YOUR_ANON_KEY',
+      STORAGE_BUCKETS: {
+        avatars: 'avatars',
+        vehicles: 'vehicles', 
+        products: 'products',
+        stores: 'stores'
+      },
+      MAP_CENTER: [33.3152, 44.3661],
+      ADMIN_USER_ID: 'admin-uuid-here',
+      APP_VERSION: '4.1.2',
+      CASH_ONLY: true
+    };
+  }
+})();
+
+// ✅ تعريف CONFIG بأمان
 const CONFIG = window.ShiraConfig;
 
 const App = {
@@ -602,7 +606,7 @@ const Views = {
 };
 
 // ==========================================
-// 🔐 Auth Module - ✅ تم تصحيح جميع الأخطاء النحوية
+// 🔐 Auth Module - ✅ تم تصحيح جميع الأخطاء
 // ==========================================
 const Auth = {
   login: async () => {
@@ -653,7 +657,7 @@ const Auth = {
       } catch (e) { console.warn('⚠️ فشل رفع الصورة الشخصية:', e); }
     }
     
-    // ✅ التصحيح النهائي هنا:
+    // ✅ التصحيح النهائي: signUp syntax
     const { data: authData, error: authErr } = await App.db.auth.signUp({
       email: phone + '@shira.app',
       password: pass,
